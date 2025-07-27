@@ -13,6 +13,7 @@ app.use(
 
 // JSON parsing
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // API routes
 app.use('/api/images', imagesRouter);

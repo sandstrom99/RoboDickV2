@@ -1,71 +1,74 @@
-import { Request, Response, NextFunction } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
-import { getPagination } from '../utils/paginate';
+import { Request, Response, NextFunction } from 'express';
 
 const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads');
+const HASH_FILE = path.join(__dirname, '..', '..', 'data', 'hashes.json');
 
-export async function listImages(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
+interface HashRecord { hash: string }
+
+async function readHashes(): Promise<HashRecord[]> {
   try {
-    const files = await fs.readdir(UPLOAD_DIR);
-    const { start, limit } = getPagination(
-      req.query.page as string,
-      req.query.limit as string
-    );
-    const total = files.length;
-    const slice = files.slice(start, start + limit);
-
-    // Map filenames → full URLs
-    const host = `${req.protocol}://${req.get('host')}`;
-    const images = slice.map((fn) => `${host}/images/${fn}`);
-
-    res.json({
-      total,
-      page: Number(req.query.page) || 1,
-      images,
-    });
+    const raw = await fs.readFile(HASH_FILE, 'utf-8');
+    return JSON.parse(raw) as HashRecord[];
   } catch (err) {
-    next(err);
+    // if file missing, return empty
+    return [];
   }
 }
 
-export async function randomImage(
-  _req: Request,
-  res: Response,
-  next: NextFunction
-) {
+async function writeHashes(records: HashRecord[]): Promise<void> {
+  await fs.mkdir(path.dirname(HASH_FILE), { recursive: true });
+  await fs.writeFile(HASH_FILE, JSON.stringify(records, null, 2));
+}
+
+export async function getHashes(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const hashes = await readHashes();
+    res.json(hashes);
+  } catch (err) {
+    next(err as Error);
+  }
+}
+
+export async function listImages(req: Request, res: Response, next: NextFunction) {
   try {
     const files = await fs.readdir(UPLOAD_DIR);
-    if (files.length === 0) {
-      return res.status(404).send('No images available');
-    }
+    const page = Math.max(parseInt(req.query.page as string) || 1, 1);
+    const limit = Math.max(parseInt(req.query.limit as string) || 10, 1);
+    const start = (page - 1) * limit;
+    const images = files.slice(start, start + limit).map(fn => fn);
+    res.json({ total: files.length, page, images });
+  } catch (err) {
+    next(err as Error);
+  }
+}
 
+export async function randomImage(_req: Request, res: Response, next: NextFunction) {
+  try {
+    const files = await fs.readdir(UPLOAD_DIR);
     const choice = files[Math.floor(Math.random() * files.length)];
-    const filePath = path.join(UPLOAD_DIR, choice);
-
-    return res.sendFile(filePath);
+    res.sendFile(path.join(UPLOAD_DIR, choice));
   } catch (err) {
-    next(err);
+    next(err as Error);
   }
 }
 
-export async function uploadImage(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
+export async function uploadImage(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+      return res.status(400).json({ error: 'No file' });
     }
-    return res
-      .status(201)
-      .json({ filename: req.file.filename, url: `/images/${req.file.filename}` });
+    // read existing hashes
+    const records = await readHashes();
+    // if hash present, append
+    const incomingHash = req.body.hash;
+    if (incomingHash) {
+      records.push({ hash: incomingHash });
+      await writeHashes(records);
+    }
+    res.status(201).json({ filename: req.file.filename, url: `/images/${req.file.filename}` });
   } catch (err) {
-    next(err);
+    next(err as Error);
   }
 }

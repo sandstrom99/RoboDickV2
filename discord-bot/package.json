@@ -1,12 +1,12 @@
 {
-  "name": "image-service",
+  "name": "discord-bot",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-      "dev": "ts-node-dev --respawn --transpile-only --watch src src/index.ts",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write ."
   },
@@ -14,28 +14,23 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^5.1.0",
-    "multer": "^2.0.2",
-    "uuid": "^11.1.0"
+    "axios": "^1.11.0",
+    "discord.js": "^14.21.0",
+    "dotenv": "^17.2.1",
+    "image-hash": "^5.3.2",
+    "jimp": "^1.6.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.3",
-    "@types/multer": "^2.0.0",
     "@types/node": "^24.1.0",
-    "@types/uuid": "^10.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.38.0",
-    "@typescript-eslint/parser": "^8.38.0",
+    "discord-api-types": "^0.38.17",
     "eslint": "^8.57.1",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^5.5.3",
-    "globals": "^16.3.0",
-    "jiti": "^2.5.1",
     "nodemon": "^3.1.10",
     "prettier": "^3.6.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.8.3",
-    "typescript-eslint": "^8.38.0"
+    "typescript": "^5.8.3"
   }
 }
