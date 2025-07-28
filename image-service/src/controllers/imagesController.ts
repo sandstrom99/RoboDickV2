@@ -1,73 +1,190 @@
 import fs from 'fs/promises';
 import path from 'path';
+import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 
 const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads');
-const HASH_FILE = path.join(__dirname, '..', '..', 'data', 'hashes.json');
+const META_FILE = path.join(__dirname, '..', '..', 'data', 'metadata.json');
 
-interface HashRecord { hash: string }
+interface MetadataRecord {
+  uuid: string;
+  filename: string;
+  hash: string;
+  createdAt: string;
+  uploaderId: string;
+  uploaderName: string;
+}
 
-async function readHashes(): Promise<HashRecord[]> {
+// Helper function to calculate file hash
+async function calculateFileHash(filePath: string): Promise<string> {
+  const fileBuffer = await fs.readFile(filePath);
+  return crypto.createHash('md5').update(fileBuffer).digest('hex');
+}
+
+// Read metadata.json or return empty
+async function readMetadata(): Promise<MetadataRecord[]> {
   try {
-    const raw = await fs.readFile(HASH_FILE, 'utf-8');
-    return JSON.parse(raw) as HashRecord[];
-  } catch (err) {
-    // if file missing, return empty
+    const raw = await fs.readFile(META_FILE, 'utf-8');
+    return JSON.parse(raw) as MetadataRecord[];
+  } catch {
     return [];
   }
 }
 
-async function writeHashes(records: HashRecord[]): Promise<void> {
-  await fs.mkdir(path.dirname(HASH_FILE), { recursive: true });
-  await fs.writeFile(HASH_FILE, JSON.stringify(records, null, 2));
+// Write metadata array back to file
+async function writeMetadata(records: MetadataRecord[]): Promise<void> {
+  await fs.mkdir(path.dirname(META_FILE), { recursive: true });
+  await fs.writeFile(META_FILE, JSON.stringify(records, null, 2));
 }
 
-export async function getHashes(_req: Request, res: Response, next: NextFunction) {
+// GET /api/images
+export async function listImages(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
   try {
-    const hashes = await readHashes();
-    res.json(hashes);
-  } catch (err) {
-    next(err as Error);
-  }
-}
-
-export async function listImages(req: Request, res: Response, next: NextFunction) {
-  try {
-    const files = await fs.readdir(UPLOAD_DIR);
     const page = Math.max(parseInt(req.query.page as string) || 1, 1);
     const limit = Math.max(parseInt(req.query.limit as string) || 10, 1);
+    const metadata = await readMetadata();
+    const total = metadata.length;
     const start = (page - 1) * limit;
-    const images = files.slice(start, start + limit).map(fn => fn);
-    res.json({ total: files.length, page, images });
+    const pageRecords = metadata.slice(start, start + limit);
+    // Prepend URL path
+    const images = pageRecords.map(rec => ({
+      uuid: rec.uuid,
+      uploaderId: rec.uploaderId,
+      uploaderName: rec.uploaderName,
+      filename: rec.filename,
+      url: rec.filename,
+      createdAt: rec.createdAt,
+      hash: rec.hash
+    }));
+    res.json({ total, page, images });
   } catch (err) {
     next(err as Error);
   }
 }
 
-export async function randomImage(_req: Request, res: Response, next: NextFunction) {
+// GET /api/images/count
+export async function getImageCount(_req: Request, res: Response, next: NextFunction) {
   try {
-    const files = await fs.readdir(UPLOAD_DIR);
-    const choice = files[Math.floor(Math.random() * files.length)];
-    res.sendFile(path.join(UPLOAD_DIR, choice));
+    const metadata = await readMetadata();
+    res.json({ count: metadata.length });
   } catch (err) {
     next(err as Error);
   }
 }
 
-export async function uploadImage(req: Request, res: Response, next: NextFunction) {
+// GET /api/images/:uuid
+export async function getImageById(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { uuid } = req.params;
+    const metadata = await readMetadata();
+    const record = metadata.find(r => r.uuid === uuid);
+    if (!record) return res.status(404).json({ error: 'Image not found' });
+    res.json(record);
+  } catch (err) {
+    next(err as Error);
+  }
+}
+
+// GET /api/images/random
+export async function randomImage(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const count = Math.max(1, Math.min(parseInt(req.query.count as string) || 1, 9));
+    const metadata = await readMetadata();
+    if (metadata.length === 0) {
+      return res.status(404).json({ error: 'No images' });
+    }
+    // Shuffle and pick random images
+    const shuffled = metadata.sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, count);
+    // Construct URLs (assuming /images/ is the static path)
+    const urls = selected.map(rec => `/images/${rec.filename}`);
+    res.json({ urls });
+  } catch (err) {
+    next(err as Error);
+  }
+}
+
+// GET /api/images/hashes (metadata list)
+export async function getHashes(
+  _req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const metadata = await readMetadata();
+    // return minimal info
+    res.json(metadata.map(rec => ({ uuid: rec.uuid, hash: rec.hash, filename: rec.filename, createdAt: rec.createdAt })));
+  } catch (err) {
+    next(err as Error);
+  }
+}
+
+// POST /api/images
+export async function uploadImage(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'No file' });
+      return res.status(400).json({ error: 'No file uploaded' });
     }
-    // read existing hashes
-    const records = await readHashes();
-    // if hash present, append
-    const incomingHash = req.body.hash;
-    if (incomingHash) {
-      records.push({ hash: incomingHash });
-      await writeHashes(records);
+    const uploaderId = req.body.uploaderId as string || 'unknown';
+    const uploaderName = req.body.uploaderName as string || 'Unknown User';
+    const filename = req.file.filename;
+    const ext = path.extname(filename);
+    const uuid = path.basename(filename, ext);
+    const createdAt = new Date().toISOString();
+    
+    // Calculate hash if not provided
+    const filePath = path.join(UPLOAD_DIR, filename);
+    const hash = req.body.hash || await calculateFileHash(filePath);
+    
+    const metadata = await readMetadata();
+    const newRecord: MetadataRecord = {
+      uuid,
+      filename,
+      hash,
+      createdAt,
+      uploaderId,
+      uploaderName,
+    };
+    metadata.push(newRecord);
+    await writeMetadata(metadata);
+    res.status(201).json({ uuid, filename, url: filename, createdAt, hash: newRecord.hash });
+  } catch (err) {
+    next(err as Error);
+  }
+}
+
+// DELETE /api/images/:uuid
+export async function deleteImage(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { uuid } = req.params;
+    const metadata = await readMetadata();
+    const recordIndex = metadata.findIndex(r => r.uuid === uuid);
+    if (recordIndex === -1) {
+      return res.status(404).json({ error: 'Image not found' });
     }
-    res.status(201).json({ filename: req.file.filename, url: `/images/${req.file.filename}` });
+    const record = metadata[recordIndex];
+    // remove file
+    await fs.unlink(path.join(UPLOAD_DIR, record.filename));
+    // update metadata
+    metadata.splice(recordIndex, 1);
+    await writeMetadata(metadata);
+    res.status(204).end();
   } catch (err) {
     next(err as Error);
   }

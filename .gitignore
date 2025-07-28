@@ -134,3 +134,36 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# =============================================================================
+# PROJECT-SPECIFIC IGNORES
+# =============================================================================
+
+# Discord Bot
+discord-bot/.env
+discord-bot/dist/
+
+# Image Service
+image-service/uploads/
+image-service/data/metadata.json
+image-service/dist/
+
+# Portal (React/Vite)
+portal/dist/
+portal/build/
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
