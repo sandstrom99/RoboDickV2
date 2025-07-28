@@ -24,12 +24,15 @@ export default function App() {
   const [totalImages, setTotalImages] = useState(0);
   const [currentTab, setCurrentTab] = useState<'gallery' | 'screensaver'>('gallery');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Check if user is already authenticated on app load
   useEffect(() => {
     const authenticated = sessionStorage.getItem('portal_authenticated');
+    const adminStatus = sessionStorage.getItem('portal_admin');
     if (authenticated === 'true') {
       setIsAuthenticated(true);
+      setIsAdmin(adminStatus === 'true');
     }
   }, []);
 
@@ -45,10 +48,9 @@ export default function App() {
   useEffect(() => {
     if (isAuthenticated && currentTab === 'gallery') {
       if (page !== 1) {
-        setPage(1);
-      } else {
-        loadPage(1);
+        setPage(1); // This will trigger the first useEffect to call loadPage(1)
       }
+      // Don't call loadPage directly here - let the page dependency handle it
     }
   }, [searchTerm, currentTab, isAuthenticated]);
 
@@ -104,28 +106,64 @@ export default function App() {
   }
 
   async function handleUpload(files: FileList) {
+    let uploaded = 0;
+    let duplicates = 0;
+    let errors = 0;
+    
     try {
       for (const file of Array.from(files)) {
-        await uploadImage(file);
+        try {
+          await uploadImage(file);
+          uploaded++;
+          console.log(`✅ Uploaded: ${file.name}`);
+        } catch (error) {
+          if (error instanceof Error && error.message.includes('Duplicate image detected')) {
+            duplicates++;
+            console.log(`🚫 Duplicate: ${file.name} - ${error.message}`);
+          } else {
+            errors++;
+            console.error(`❌ Failed to upload ${file.name}:`, error);
+          }
+        }
       }
-      await loadPage(page);
-      await loadTotalStats();
+      
+      // Show results
+      let message = '';
+      if (uploaded > 0) message += `✅ Uploaded ${uploaded} new image(s). `;
+      if (duplicates > 0) message += `🚫 Skipped ${duplicates} duplicate(s). `;
+      if (errors > 0) message += `❌ Failed to upload ${errors} image(s). `;
+      
+      if (message) {
+        alert(message.trim());
+      }
+      
+      // Only refresh if we uploaded something new
+      if (uploaded > 0) {
+        await loadPage(page);
+        await loadTotalStats();
+      }
+      
       setIsUploadModalOpen(false);
     } catch (error) {
-      console.error('Failed to upload images:', error);
-      alert('Failed to upload images. Please try again.');
+      console.error('Upload process failed:', error);
+      alert('Upload process failed. Please try again.');
     }
   }
 
   // Handle successful authentication
-  const handleAuthentication = () => {
+  const handleAuthentication = (adminAccess: boolean = false) => {
     setIsAuthenticated(true);
+    setIsAdmin(adminAccess);
+    sessionStorage.setItem('portal_authenticated', 'true');
+    sessionStorage.setItem('portal_admin', adminAccess.toString());
   };
 
   // Handle logout
   const handleLogout = () => {
     sessionStorage.removeItem('portal_authenticated');
+    sessionStorage.removeItem('portal_admin');
     setIsAuthenticated(false);
+    setIsAdmin(false);
     // Reset app state
     setCurrentTab('gallery');
     setIsUploadModalOpen(false);
@@ -233,6 +271,7 @@ export default function App() {
                       image={img}
                       onDelete={handleDelete}
                       onView={setSelectedImage}
+                      showDelete={isAdmin}
                     />
                   ))}
                 </div>
@@ -262,6 +301,7 @@ export default function App() {
           image={selectedImage}
           onClose={() => setSelectedImage(null)}
           onDelete={handleDelete}
+          showDelete={isAdmin}
         />
         </>
       )}

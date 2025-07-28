@@ -15,11 +15,13 @@ interface MetadataRecord {
   uploaderName: string;
 }
 
-// Helper function to calculate file hash
+// Helper function to calculate file hash (fallback for non-images)
 async function calculateFileHash(filePath: string): Promise<string> {
   const fileBuffer = await fs.readFile(filePath);
   return crypto.createHash('md5').update(fileBuffer).digest('hex');
 }
+
+
 
 // Read metadata.json or return empty
 async function readMetadata(): Promise<MetadataRecord[]> {

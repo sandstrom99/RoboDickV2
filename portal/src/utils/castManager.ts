@@ -27,6 +27,12 @@ export class CastManager {
       // Wait for Cast API to load
       await this.waitForCastApi();
 
+      // Check if Cast API is properly loaded
+      if (!window.cast || !window.cast.framework || !window.chrome || !window.chrome.cast) {
+        console.error('❌ Cast API not properly loaded');
+        return false;
+      }
+
       // Configure Cast context
       const castContext = window.cast.framework.CastContext.getInstance();
       castContext.setOptions({
@@ -58,23 +64,46 @@ export class CastManager {
   // Wait for Cast API to be available
   private waitForCastApi(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (window.cast && window.cast.framework) {
+      console.log('🔍 Checking for Cast API...');
+      console.log('window.cast:', !!window.cast);
+      console.log('window.chrome:', !!window.chrome);
+      
+      if (window.cast && window.cast.framework && window.chrome && window.chrome.cast) {
+        console.log('✅ Cast API already available');
         resolve();
         return;
       }
 
+      let attempts = 0;
+      const maxAttempts = 100; // 10 seconds
+      
       const checkInterval = setInterval(() => {
-        if (window.cast && window.cast.framework) {
+        attempts++;
+        
+        // Log every 10 attempts (every second)
+        if (attempts % 10 === 0) {
+          console.log(`🔄 Cast API check attempt ${attempts}/100`);
+          console.log('  - window.cast:', !!window.cast);
+          console.log('  - window.cast.framework:', !!(window.cast && window.cast.framework));
+          console.log('  - window.chrome:', !!window.chrome);
+          console.log('  - window.chrome.cast:', !!(window.chrome && window.chrome.cast));
+        }
+        
+        if (window.cast && window.cast.framework && window.chrome && window.chrome.cast) {
+          console.log('✅ Cast API detected after', attempts, 'attempts');
           clearInterval(checkInterval);
           resolve();
+        } else if (attempts >= maxAttempts) {
+          console.error('❌ Cast API timeout after', attempts, 'attempts');
+          console.log('Final state:');
+          console.log('  - window.cast:', !!window.cast);
+          console.log('  - window.cast.framework:', !!(window.cast && window.cast.framework));
+          console.log('  - window.chrome:', !!window.chrome);
+          console.log('  - window.chrome.cast:', !!(window.chrome && window.chrome.cast));
+          clearInterval(checkInterval);
+          reject(new Error('Cast API not available after 10 seconds'));
         }
       }, 100);
-
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        clearInterval(checkInterval);
-        reject(new Error('Cast API not available'));
-      }, 10000);
     });
   }
 

@@ -1,0 +1,38 @@
+# Cloudflare Tunnel Configuration for RoboDickV2
+# Replace YOUR_TUNNEL_ID with your actual tunnel ID from: cloudflared tunnel create robodick
+
+tunnel: YOUR_TUNNEL_ID
+credentials-file: /path/to/YOUR_TUNNEL_ID.json
+
+# Configure ingress rules
+ingress:
+  # Portal (main web interface)
+  - hostname: portal.yourdomain.com
+    service: http://localhost:5173
+    originRequest:
+      httpHostHeader: localhost:5173
+      
+  # Image Service API
+  - hostname: api.yourdomain.com
+    service: http://localhost:3000
+    originRequest:
+      httpHostHeader: localhost:3000
+      
+  # Image files (direct access)
+  - hostname: images.yourdomain.com
+    service: http://localhost:3000
+    path: /images/*
+    originRequest:
+      httpHostHeader: localhost:3000
+      
+  # Catch-all (required)
+  - service: http_status:404
+
+# Optional: Access control
+# warp-routing:
+#   enabled: true
+
+# Optional: Additional security
+# access:
+#   - hostname: portal.yourdomain.com
+#     audience: your-audience-tag 

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { ImageMeta } from './types';
+import { computeHash, hammingDistance } from './utils/imageHash';
 
 const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}`;
 const API_IMAGES = `${API_BASE}/api/images`;
@@ -19,10 +20,36 @@ export async function getTotalImageCount(): Promise<number> {
 }
 
 export async function uploadImage(file: File): Promise<ImageMeta> {
+  // First, get existing hashes to check for duplicates
+  const { data: existingHashes } = await axios.get<{ uuid: string; hash: string; filename: string }[]>(`${API_IMAGES}/hashes`);
+  
+  // Calculate hash of the new image
+  const fileBuffer = await file.arrayBuffer();
+  const buffer = new Uint8Array(fileBuffer);
+  const newHash = await computeHash(buffer);
+  
+  console.log(`🔍 Calculated hash for ${file.name}: ${newHash}`);
+  
+  // Check for duplicates using hamming distance
+  const HASH_THRESHOLD = 5; // Same as discord bot default
+  const duplicate = existingHashes.find(existing => 
+    hammingDistance(existing.hash, newHash) <= HASH_THRESHOLD
+  );
+  
+  if (duplicate) {
+    const distance = hammingDistance(duplicate.hash, newHash);
+    console.log(`🚫 Duplicate detected! Similar to: ${duplicate.filename} (distance: ${distance})`);
+    throw new Error(`Duplicate image detected! Similar to: ${duplicate.filename} (similarity: ${HASH_THRESHOLD - distance}/${HASH_THRESHOLD})`);
+  }
+  
+  // Upload with hash
   const formData = new FormData();
   formData.append('image', file);
+  formData.append('hash', newHash);
   formData.append('uploaderId', 'portal-user');
   formData.append('uploaderName', 'Portal User');
+  
+  console.log(`📤 Uploading ${file.name} with hash: ${newHash}`);
   
   const res = await axios.post(API_IMAGES, formData, {
     headers: {
@@ -30,6 +57,7 @@ export async function uploadImage(file: File): Promise<ImageMeta> {
     },
   });
   
+  console.log(`✅ Successfully uploaded ${file.name}`);
   return res.data;
 }
 

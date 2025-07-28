@@ -294,7 +294,7 @@ export function Screensaver({ onExit }: Props) {
             {/* Cast Button */}
             <div className="border-l border-slate-600 pl-6">
               <CastButton
-                currentImage={currentImage}
+                currentImage={currentImage || undefined}
                 imagePool={imagePool}
                 onCastStatusChange={handleCastStatusChange}
               />
