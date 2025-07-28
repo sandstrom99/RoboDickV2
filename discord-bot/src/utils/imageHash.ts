@@ -16,8 +16,8 @@ export async function computeHash(buffer: Buffer): Promise<string> {
       return hash.substring(0, 16); // Return 16-character hash
     }
     
-    console.error('Failed to process image for hashing:', error);
-    throw new Error(`Failed to process image for hashing: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.warn('Failed to process image for hashing (unsupported format or other error), will use server-side file hash:', error instanceof Error ? error.message : 'Unknown error');
+    return ''; // Return empty hash to let image-service handle file hashing
   }
 }
 

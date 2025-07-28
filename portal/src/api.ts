@@ -31,7 +31,7 @@ export async function uploadImage(file: File): Promise<ImageMeta> {
   console.log(`🔍 Calculated hash for ${file.name}: ${newHash}`);
   
   // Check for duplicates using hamming distance
-  const HASH_THRESHOLD = 5; // Same as discord bot default
+  const HASH_THRESHOLD = 3// Same as discord bot default
   const duplicate = existingHashes.find(existing => 
     hammingDistance(existing.hash, newHash) <= HASH_THRESHOLD
   );
