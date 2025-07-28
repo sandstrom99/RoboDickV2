@@ -106,5 +106,38 @@ client.on('messageCreate', async (msg: Message) => {
   }
 });
 
+// Add error handling for connection issues
+client.on('error', (error: any) => {
+  if (error.code === 'EPIPE' || error.errno === -32) {
+    console.warn('🔗 Discord connection broken (EPIPE), will attempt to reconnect...');
+    // Don't crash, let Discord.js handle reconnection
+    return;
+  }
+  console.error('🚫 Discord client error:', error);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('🚫 Unhandled Promise Rejection at:', promise, 'reason:', reason);
+  // Don't crash the process for upload-related errors
+  if (reason && typeof reason === 'object' && 'code' in reason && reason.code === 'EPIPE') {
+    console.warn('🔗 Upload interrupted due to connection issue, continuing...');
+    return;
+  }
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error: any) => {
+  if (error.code === 'EPIPE' || error.errno === -32) {
+    console.warn('🔗 Uncaught EPIPE error during upload, continuing...');
+    return;
+  }
+  console.error('🚫 Uncaught Exception:', error);
+  // Graceful shutdown for other critical errors
+  console.log('🔄 Attempting graceful shutdown...');
+  client.destroy();
+  process.exit(1);
+});
+
 console.log('Starting Discord bot...');
 client.login(process.env.DISCORD_TOKEN!);
