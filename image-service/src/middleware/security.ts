@@ -58,7 +58,7 @@ export const securityHeaders = helmet({
 // Enhanced CORS configuration
 export const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    // Allow requests with no origin (mobile apps, etc.)
+    // Allow requests with no origin (mobile apps, Chromecast, etc.)
     if (!origin) return callback(null, true);
     
     // In development, allow all localhost and local network origins
@@ -80,10 +80,10 @@ export const corsOptions = {
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true,
+  credentials: false, // Changed to false to allow broader access for media devices
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Range'], // Added Range header for media streaming
 };
 
 // IP whitelist middleware (optional)

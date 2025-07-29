@@ -17,13 +17,13 @@ const colorClasses = {
 
 export function StatsCard({ title, value, icon, color }: Props) {
   return (
-    <div className={`bg-gradient-to-r ${colorClasses[color]} text-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-200`}>
+    <div className={`bg-gradient-to-r ${colorClasses[color]} text-white rounded-xl p-3 sm:p-6 shadow-lg hover:shadow-xl transition-shadow duration-200`}>
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-white/80">{title}</p>
-          <p className="text-2xl font-bold text-white">{value}</p>
+          <p className="text-xs sm:text-sm font-medium text-white/80">{title}</p>
+          <p className="text-lg sm:text-2xl font-bold text-white">{value}</p>
         </div>
-        <div className="text-3xl opacity-80">
+        <div className="text-xl sm:text-3xl opacity-80">
           {icon}
         </div>
       </div>

@@ -7,19 +7,19 @@ credentials-file: /path/to/YOUR_TUNNEL_ID.json
 # Configure ingress rules
 ingress:
   # Portal (main web interface)
-  - hostname: portal.yourdomain.com
+  - hostname: portal.baldersandstrom.com
     service: http://localhost:5173
     originRequest:
       httpHostHeader: localhost:5173
       
   # Image Service API
-  - hostname: api.yourdomain.com
+  - hostname: api.baldersandstrom.com
     service: http://localhost:3000
     originRequest:
       httpHostHeader: localhost:3000
       
   # Image files (direct access)
-  - hostname: images.yourdomain.com
+  - hostname: images.baldersandstrom.com
     service: http://localhost:3000
     path: /images/*
     originRequest:

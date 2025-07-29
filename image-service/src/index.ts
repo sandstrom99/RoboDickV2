@@ -34,8 +34,18 @@ if (allowedIPs.length > 0) {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve uploaded images
-app.use('/images', express.static(path.join(__dirname, '..', 'uploads')));
+// Serve uploaded images with proper headers for media streaming
+app.use('/images', (req, res, next) => {
+  // Set headers for better media streaming and Chromecast compatibility
+  res.set({
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+    'Access-Control-Allow-Headers': 'Range, Content-Range, Content-Type',
+    'Accept-Ranges': 'bytes',
+    'Cache-Control': 'public, max-age=31536000' // 1 year cache for images
+  });
+  next();
+}, express.static(path.join(__dirname, '..', 'uploads')));
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {

@@ -9,7 +9,8 @@ export default defineConfig({
     allowedHosts: [
       '.trycloudflare.com', // Allow all Cloudflare tunnel subdomains
       'localhost',
-      '127.0.0.1'
+      '127.0.0.1',
+      'baldersandstrom.com'
     ]
   }
 })

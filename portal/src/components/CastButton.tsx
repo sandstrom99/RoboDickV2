@@ -25,21 +25,86 @@ export function CastButton({ currentImage, imagePool = [], onCastStatusChange }:
     }
   }, [isConnected, deviceName, onCastStatusChange]);
 
+  // Auto-cast current image when it changes (if connected)
+  useEffect(() => {
+    if (isConnected && currentImage) {
+      console.log('📺 Auto-casting new image to', deviceName);
+      const castImage = async () => {
+        try {
+          const castImageData: CastImage = {
+            url: currentImage,
+            title: `Image from RoboDickV2`,
+            subtitle: `Image ${imagePool.indexOf(currentImage) + 1} of ${imagePool.length}`
+          };
+          
+          await castManager.castImage(castImageData);
+        } catch (error) {
+          console.error('❌ Auto-cast failed:', error);
+        }
+      };
+      
+      // Small delay to ensure smooth transitions
+      const timeout = setTimeout(castImage, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [currentImage, isConnected, deviceName, imagePool]);
+
   const initializeCast = async () => {
     try {
       setIsInitializing(true);
       const initialized = await castManager.initialize();
       
       if (initialized) {
-        setIsCastAvailable(castManager.isCastAvailable());
-        setIsConnected(castManager.isConnected());
-        setDeviceName(castManager.getReceiverName());
+        // Check initial states
+        const initialAvailable = castManager.isCastAvailable();
+        const initialConnected = castManager.isConnected();
+        const initialDeviceName = castManager.getReceiverName();
+        
+        console.log('📊 Initial Cast states:');
+        console.log('  - Available:', initialAvailable);
+        console.log('  - Connected:', initialConnected);
+        console.log('  - Device:', initialDeviceName || 'None');
+        
+        setIsCastAvailable(initialAvailable);
+        setIsConnected(initialConnected);
+        setDeviceName(initialDeviceName);
         
         // Create the native Cast button
         if (castButtonRef.current && window.cast) {
           const castButton = document.createElement('google-cast-launcher-element');
           castButtonRef.current.appendChild(castButton);
         }
+        
+        // Set up periodic checks for device availability (in case devices come online later)
+        const checkDevices = () => {
+          const available = castManager.isCastAvailable();
+          const connected = castManager.isConnected();
+          const deviceName = castManager.getReceiverName();
+          
+          if (available !== isCastAvailable) {
+            console.log('📡 Cast availability changed:', available);
+            setIsCastAvailable(available);
+          }
+          
+          if (connected !== isConnected) {
+            console.log('📺 Cast connection changed:', connected);
+            setIsConnected(connected);
+          }
+          
+          if (deviceName !== deviceName) {
+            setDeviceName(deviceName);
+          }
+        };
+        
+        // Check every 3 seconds for the first 30 seconds, then every 10 seconds
+        const shortInterval = setInterval(checkDevices, 3000);
+        setTimeout(() => {
+          clearInterval(shortInterval);
+          const longInterval = setInterval(checkDevices, 10000);
+          
+          // Clear after 5 minutes
+          setTimeout(() => clearInterval(longInterval), 300000);
+        }, 30000);
       }
     } catch (error) {
       console.error('❌ Failed to initialize Cast:', error);
@@ -75,11 +140,61 @@ export function CastButton({ currentImage, imagePool = [], onCastStatusChange }:
 
   const handleDisconnect = async () => {
     try {
-      await castManager.endSession();
+      console.log('🔌 User requested disconnect');
+      
+      // Immediately update UI to prevent multiple clicks
       setIsConnected(false);
       setDeviceName('');
+      
+      // End the Cast session
+      await castManager.endSession();
+      
+      // Double-check state after disconnect
+      setTimeout(() => {
+        const stillConnected = castManager.isConnected();
+        if (stillConnected) {
+          console.warn('⚠️ Still showing as connected after disconnect attempt');
+        } else {
+          console.log('✅ Disconnect confirmed');
+        }
+      }, 1000);
+      
     } catch (error) {
       console.error('❌ Failed to disconnect:', error);
+      // Ensure UI is still updated even if disconnect failed
+      setIsConnected(false);
+      setDeviceName('');
+    }
+  };
+
+  const handleRefreshDevices = async () => {
+    try {
+      console.log('🔄 Manually refreshing Cast devices...');
+      setIsInitializing(true);
+      
+      // Force device discovery
+      await castManager.forceDeviceDiscovery();
+      
+      // Check for devices after discovery
+      setTimeout(() => {
+        const available = castManager.isCastAvailable();
+        const connected = castManager.isConnected();
+        const deviceName = castManager.getReceiverName();
+        
+        console.log('📊 After refresh:');
+        console.log('  - Available:', available);
+        console.log('  - Connected:', connected);
+        console.log('  - Device:', deviceName || 'None');
+        
+        setIsCastAvailable(available);
+        setIsConnected(connected);
+        setDeviceName(deviceName);
+        setIsInitializing(false);
+      }, 2000);
+      
+    } catch (error) {
+      console.error('❌ Failed to refresh devices:', error);
+      setIsInitializing(false);
     }
   };
 
@@ -94,8 +209,18 @@ export function CastButton({ currentImage, imagePool = [], onCastStatusChange }:
 
   if (!isCastAvailable) {
     return (
-      <div className="text-sm text-slate-400">
-        📺 No Cast devices found
+      <div className="flex items-center space-x-3">
+        <div className="text-sm text-slate-400">
+          📺 No Cast devices found
+        </div>
+        <button
+          onClick={handleRefreshDevices}
+          className="text-xs text-blue-400 hover:text-blue-300 underline cursor-pointer"
+          title="Refresh Cast devices"
+          disabled={isInitializing}
+        >
+          🔄 Refresh
+        </button>
       </div>
     );
   }

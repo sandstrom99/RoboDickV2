@@ -48,10 +48,49 @@ export async function listImages(
   try {
     const page = Math.max(parseInt(req.query.page as string) || 1, 1);
     const limit = Math.max(parseInt(req.query.limit as string) || 10, 1);
+    const orderBy = req.query.orderBy as string || 'createdAt';
+    const orderDirection = req.query.orderDirection as string || 'desc';
+    
     const metadata = await readMetadata();
-    const total = metadata.length;
+    
+    // Sort the metadata based on orderBy and orderDirection
+    const sortedMetadata = [...metadata].sort((a, b) => {
+      let aValue: any, bValue: any;
+      
+      switch (orderBy) {
+        case 'createdAt':
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
+          break;
+        case 'filename':
+          aValue = a.filename.toLowerCase();
+          bValue = b.filename.toLowerCase();
+          break;
+        case 'uploaderName':
+          aValue = a.uploaderName.toLowerCase();
+          bValue = b.uploaderName.toLowerCase();
+          break;
+        case 'uuid':
+          aValue = a.uuid;
+          bValue = b.uuid;
+          break;
+        default:
+          // Default to createdAt
+          aValue = new Date(a.createdAt).getTime();
+          bValue = new Date(b.createdAt).getTime();
+      }
+      
+      if (orderDirection === 'asc') {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      } else {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+      }
+    });
+    
+    const total = sortedMetadata.length;
     const start = (page - 1) * limit;
-    const pageRecords = metadata.slice(start, start + limit);
+    const pageRecords = sortedMetadata.slice(start, start + limit);
+    
     // Prepend URL path
     const images = pageRecords.map(rec => ({
       uuid: rec.uuid,
@@ -62,6 +101,7 @@ export async function listImages(
       createdAt: rec.createdAt,
       hash: rec.hash
     }));
+    
     res.json({ total, page, images });
   } catch (err) {
     next(err as Error);

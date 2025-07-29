@@ -59,9 +59,9 @@ export default function App() {
     setLoading(true);
     try {
       console.log('🔍 Loading page:', p, 'with limit:', limit);
-      console.log('🌐 API URL:', `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/images?page=${p}&limit=${limit}`);
+      console.log('🌐 API URL:', `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/images?page=${p}&limit=${limit}&orderBy=createdAt&orderDirection=desc`);
       
-      const data = await fetchImages(p, limit);
+      const data = await fetchImages(p, limit, 'createdAt', 'desc');
       console.log('✅ Received data:', data);
       
       setImages(data.images);
@@ -210,9 +210,9 @@ export default function App() {
             onLogout={handleLogout}
           />
         
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
           {/* Stats Dashboard */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-3 md:grid-cols-3 gap-2 sm:gap-6 mb-8">
             <StatsCard
               title="Total Images"
               value={totalImages.toLocaleString()}
@@ -264,7 +264,7 @@ export default function App() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 mb-8">
                   {filteredImages.map(img => (
                     <ImageCard
                       key={img.uuid}

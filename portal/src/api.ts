@@ -5,8 +5,8 @@ import { computeHash, hammingDistance } from './utils/imageHash';
 const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}`;
 const API_IMAGES = `${API_BASE}/api/images`;
 
-export async function fetchImages(page: number, limit: number): Promise<{ total: number; page: number; images: ImageMeta[] }> {
-  const res = await axios.get(`${API_IMAGES}?page=${page}&limit=${limit}`);
+export async function fetchImages(page: number, limit: number, orderBy: string = 'createdAt', orderDirection: string = 'desc'): Promise<{ total: number; page: number; images: ImageMeta[] }> {
+  const res = await axios.get(`${API_IMAGES}?page=${page}&limit=${limit}&orderBy=${orderBy}&orderDirection=${orderDirection}`);
   return res.data;
 }
 
