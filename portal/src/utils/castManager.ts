@@ -239,7 +239,7 @@ export class CastManager {
     if (!this.isInitialized || !this.castContext) return false;
     const castState = this.castContext.getCastState();
     const isAvailable = castState !== window.cast.framework.CastState.NO_DEVICES_AVAILABLE;
-    console.log(`📡 Cast availability check: state=${castState}, available=${isAvailable}`);
+    // console.log(`📡 Cast availability check: state=${castState}, available=${isAvailable}`);
     return isAvailable;
   }
 

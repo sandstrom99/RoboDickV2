@@ -12,5 +12,17 @@ export default defineConfig({
       '127.0.0.1',
       'baldersandstrom.com'
     ]
-  }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+        },
+      },
+    },
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom'],
+  },
 })

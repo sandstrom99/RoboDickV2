@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import type { ImageMeta } from '../types';
 
 interface Props {
@@ -8,16 +8,52 @@ interface Props {
   showDelete?: boolean;
 }
 
-export function ImageModal({ image, onClose, onDelete, showDelete = false }: Props) {
-  if (!image) return null;
+// Global scroll manager to avoid React lifecycle issues
+class ScrollManager {
+  private static scrollY = 0;
+  private static isLocked = false;
 
-  // Prevent body scroll when modal is open
-  useEffect(() => {
+  static lockScroll() {
+    if (this.isLocked) return;
+    
+    this.scrollY = window.scrollY;
+    this.isLocked = true;
+    
     document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, []);
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${this.scrollY}px`;
+    document.body.style.width = '100%';
+  }
+
+  static unlockScroll() {
+    if (!this.isLocked) return;
+    
+    this.isLocked = false;
+    
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    
+    window.scrollTo(0, this.scrollY);
+  }
+}
+
+export function ImageModal({ image, onClose, onDelete, showDelete = false }: Props) {
+  // Manage scroll lock based on image presence using a stable effect
+  React.useEffect(() => {
+    if (image) {
+      // Lock scroll when an image is provided (modal opens)
+      ScrollManager.lockScroll();
+      return () => {
+        // Unlock when image changes or modal unmounts
+        ScrollManager.unlockScroll();
+      };
+    }
+  }, [image]);
+
+  // If there's no image, render nothing (after hooks have run)
+  if (!image) return null;
 
   const handleDelete = () => {
     if (confirm(`Are you sure you want to delete ${image.filename}? This action cannot be undone.`)) {
@@ -49,22 +85,20 @@ export function ImageModal({ image, onClose, onDelete, showDelete = false }: Pro
       className="fixed inset-0 flex items-center justify-center z-50 p-4"
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
       onClick={handleBackdropClick}
-      onTouchMove={(e) => e.preventDefault()}
-      onWheel={(e) => e.preventDefault()}
     >
       <div className="relative max-w-4xl max-h-[90vh] bg-white dark:bg-slate-800 rounded-xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold text-slate-800 dark:text-white truncate">
+        <div className="flex items-start justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex-1 min-w-0 pr-4">
+            <h2 className="text-lg font-semibold text-slate-800 dark:text-white break-words">
               {image.filename}
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               Uploaded by {image.uploaderName} on {new Date(image.createdAt).toLocaleDateString()}
             </p>
           </div>
           
-          <div className="flex items-center space-x-2 ml-4">
+          <div className="flex items-center space-x-2 flex-shrink-0">
             {showDelete && (
               <button
                 onClick={handleDelete}
@@ -87,7 +121,7 @@ export function ImageModal({ image, onClose, onDelete, showDelete = false }: Pro
         </div>
 
         {/* Image */}
-        <div className="relative max-h-[70vh] overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-slate-900">
+        <div className="relative max-h-[60vh] sm:max-h-[70vh] overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-slate-900">
           <img
             src={fullImageUrl}
             alt={image.filename}
@@ -96,33 +130,34 @@ export function ImageModal({ image, onClose, onDelete, showDelete = false }: Pro
         </div>
 
         {/* Footer with metadata */}
-        <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <div className="p-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700">
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {/* Row 1: Uploader | Created */}
+            <div>
+              <span className="font-medium text-slate-600 dark:text-slate-400">Uploader:</span>
+              <p className="text-slate-800 dark:text-white truncate">{image.uploaderName}</p>
+            </div>
+            <div>
+              <span className="font-medium text-slate-600 dark:text-slate-400">Created:</span>
+              <p className="text-slate-800 dark:text-white truncate">{new Date(image.createdAt).toLocaleString()}</p>
+            </div>
+
+            {/* Row 2: UUID | Image URL */}
             <div>
               <span className="font-medium text-slate-600 dark:text-slate-400">UUID:</span>
               <button
                 onClick={() => copyToClipboard(image.uuid, 'UUID')}
-                className="block w-full text-left text-slate-800 dark:text-white font-mono text-xs break-all hover:bg-slate-200 dark:hover:bg-slate-700 p-2 rounded transition-colors duration-200"
+                className="block w-full text-left text-slate-800 dark:text-white font-mono text-[10px] break-all hover:bg-slate-200 dark:hover:bg-slate-700 p-1 rounded transition-colors duration-200"
                 title="Click to copy UUID"
               >
                 {image.uuid}
               </button>
             </div>
             <div>
-              <span className="font-medium text-slate-600 dark:text-slate-400">Uploader:</span>
-              <p className="text-slate-800 dark:text-white">{image.uploaderName}</p>
-            </div>
-            <div>
-              <span className="font-medium text-slate-600 dark:text-slate-400">Created:</span>
-              <p className="text-slate-800 dark:text-white">
-                {new Date(image.createdAt).toLocaleString()}
-              </p>
-            </div>
-            <div>
               <span className="font-medium text-slate-600 dark:text-slate-400">Image URL:</span>
               <button
                 onClick={() => copyToClipboard(fullImageUrl, 'Image URL')}
-                className="block w-full text-left text-slate-800 dark:text-white font-mono text-xs break-all hover:bg-slate-200 dark:hover:bg-slate-700 p-2 rounded transition-colors duration-200"
+                className="block w-full text-left text-slate-800 dark:text-white font-mono text-[10px] break-all hover:bg-slate-200 dark:hover:bg-slate-700 p-1 rounded transition-colors duration-200"
                 title="Click to copy full image URL"
               >
                 {fullImageUrl}

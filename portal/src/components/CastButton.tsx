@@ -12,6 +12,7 @@ export function CastButton({ currentImage, imagePool = [], onCastStatusChange }:
   const [isConnected, setIsConnected] = useState(false);
   const [deviceName, setDeviceName] = useState('');
   const [isInitializing, setIsInitializing] = useState(true);
+  const [autoCastEnabled, setAutoCastEnabled] = useState(false);
   const castButtonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,9 +26,9 @@ export function CastButton({ currentImage, imagePool = [], onCastStatusChange }:
     }
   }, [isConnected, deviceName, onCastStatusChange]);
 
-  // Auto-cast current image when it changes (if connected)
+  // Auto-cast current image when it changes (if connected and auto-cast is enabled)
   useEffect(() => {
-    if (isConnected && currentImage) {
+    if (isConnected && currentImage && autoCastEnabled) {
       console.log('📺 Auto-casting new image to', deviceName);
       const castImage = async () => {
         try {
@@ -47,7 +48,7 @@ export function CastButton({ currentImage, imagePool = [], onCastStatusChange }:
       const timeout = setTimeout(castImage, 500);
       return () => clearTimeout(timeout);
     }
-  }, [currentImage, isConnected, deviceName, imagePool]);
+  }, [currentImage, isConnected, deviceName, imagePool, autoCastEnabled]);
 
   const initializeCast = async () => {
     try {
@@ -82,7 +83,7 @@ export function CastButton({ currentImage, imagePool = [], onCastStatusChange }:
           const deviceName = castManager.getReceiverName();
           
           if (available !== isCastAvailable) {
-            console.log('📡 Cast availability changed:', available);
+            // console.log('📡 Cast availability changed:', available);
             setIsCastAvailable(available);
           }
           
@@ -116,8 +117,12 @@ export function CastButton({ currentImage, imagePool = [], onCastStatusChange }:
   const handleCastClick = async () => {
     try {
       if (isConnected) {
-        // If connected, cast current image
-        if (currentImage) {
+        // If connected, toggle auto-cast mode
+        setAutoCastEnabled(!autoCastEnabled);
+        console.log('📺 Auto-cast', !autoCastEnabled ? 'enabled' : 'disabled');
+        
+        // If enabling auto-cast, cast the current image immediately
+        if (!autoCastEnabled && currentImage) {
           const castImage: CastImage = {
             url: currentImage,
             title: `Image from RoboDickV2`,
@@ -126,7 +131,7 @@ export function CastButton({ currentImage, imagePool = [], onCastStatusChange }:
           
           const success = await castManager.castImage(castImage);
           if (success) {
-            console.log('📺 Image cast to', deviceName);
+            console.log('📺 Initial image cast to', deviceName);
           }
         }
       } else {
@@ -145,6 +150,7 @@ export function CastButton({ currentImage, imagePool = [], onCastStatusChange }:
       // Immediately update UI to prevent multiple clicks
       setIsConnected(false);
       setDeviceName('');
+      setAutoCastEnabled(false); // Disable auto-cast when disconnecting
       
       // End the Cast session
       await castManager.endSession();
@@ -164,6 +170,7 @@ export function CastButton({ currentImage, imagePool = [], onCastStatusChange }:
       // Ensure UI is still updated even if disconnect failed
       setIsConnected(false);
       setDeviceName('');
+      setAutoCastEnabled(false);
     }
   };
 
@@ -232,14 +239,26 @@ export function CastButton({ currentImage, imagePool = [], onCastStatusChange }:
         onClick={handleCastClick}
         className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer ${
           isConnected
-            ? 'bg-green-600 hover:bg-green-700 text-white'
+            ? autoCastEnabled 
+              ? 'bg-green-600 hover:bg-green-700 text-white'
+              : 'bg-blue-600 hover:bg-blue-700 text-white'
             : 'bg-blue-600 hover:bg-blue-700 text-white'
         }`}
-        title={isConnected ? `Cast to ${deviceName}` : 'Connect to Cast device'}
+        title={isConnected 
+          ? autoCastEnabled 
+            ? `Auto-casting to ${deviceName} (click to disable)` 
+            : `Connected to ${deviceName} (click to enable auto-cast)`
+          : 'Connect to Cast device'
+        }
       >
         <span className="text-lg">📺</span>
         <span className="text-sm">
-          {isConnected ? 'Cast Image' : 'Cast'}
+          {isConnected 
+            ? autoCastEnabled 
+              ? 'Auto-Casting' 
+              : 'Enable Auto-Cast'
+            : 'Cast'
+          }
         </span>
       </button>
 

@@ -263,7 +263,8 @@ export function Screensaver({ onExit }: Props) {
        setTimeout(() => {
          setNextDisplayImage(nextImageUrl);
          setShowNextImage(true);
-         setNextImageVisible(false); // Start invisible
+         // Keep next image visible (it’s identical to current) –
+         // fading it out caused a brief flash while the new <img> element decoded.
          setNextImageReady(true); // Now ready to show in DOM
          
          // Small delay to ensure DOM is ready
@@ -278,13 +279,15 @@ export function Screensaver({ onExit }: Props) {
       setTimeout(async () => {
         console.log('🔄 Crossfade complete, swapping images...');
         
-        // Simply update current image and hide next image
-        setCurrentDisplayImage(nextImageUrl);
+        // Only update the current image - don't touch currentDisplayImage to avoid DOM recreation
         setCurrentImage(nextImageUrl);
         setCurrentIndex(nextIndex);
-        setNextImageVisible(false);
         
-        // Don't remove next image from DOM to prevent flash - let next transition clean it up
+        // 🎯 Transition is fully done – clear flags immediately so we don't get an extra fade
+        setIsTransitioning(false);
+        isTransitioningRef.current = false;
+        lastTransitionedImageRef.current = null;
+        console.log('✅ Transition completed, ready for next image');
         
                 // If we've cycled through all images, fetch new ones
         if (nextIndex === 0) {
@@ -299,14 +302,7 @@ export function Screensaver({ onExit }: Props) {
         preloadNextImages(nextIndex);
       }, 2000); // Longer delay to ensure transition is completely finished
         
-        // Complete the transition after the full duration
-        setTimeout(() => {
-          setIsTransitioning(false);
-          // Allow next transition
-          isTransitioningRef.current = false;
-          lastTransitionedImageRef.current = null;
-          console.log('✅ Transition completed, ready for next image');
-        }, 1400); // 1 second crossfade + 100ms cleanup + 50ms delay + buffer
+        // The transition flag is cleared in the 1300 ms timeout above – no extra delay needed here.
 
     } catch (error) {
       console.error('❌ Failed to transition to next image:', error);
@@ -442,14 +438,8 @@ export function Screensaver({ onExit }: Props) {
     setIsCastConnected(isConnected);
     setCastDeviceName(deviceName || '');
     
-    // Auto-cast current image when connection is established
-    if (isConnected && currentImage && deviceName) {
-      console.log(`📺 Cast connected to ${deviceName}, auto-casting current image`);
-      // Small delay to ensure the cast session is fully established
-      setTimeout(() => {
-        // The CastButton will handle the actual casting
-      }, 1000);
-    }
+    // Note: Removed auto-cast to prevent session disconnection
+    // User must explicitly click cast button to cast images
   }, [currentImage]);
 
   // Initialize
@@ -476,7 +466,7 @@ export function Screensaver({ onExit }: Props) {
 
   // Start autoplay after first image is loaded
   useEffect(() => {
-    if (currentImage && !intervalRef.current) {
+    if (currentImage && !intervalRef.current && isPlaying) {
       console.log('🚀 First image loaded, starting autoplay with', intervalSeconds, 'seconds interval');
       intervalRef.current = window.setInterval(() => {
         console.log('⏰ AUTOPLAY INTERVAL TICK! - Pool length:', imagePoolRef.current.length, 'Index:', currentIndexRef.current);
@@ -501,7 +491,7 @@ export function Screensaver({ onExit }: Props) {
       }, intervalSeconds * 1000);
       console.log('▶️ Autoplay started with interval ID:', intervalRef.current);
     }
-  }, [currentImage, intervalSeconds, goToNextImage]);
+  }, [currentImage, intervalSeconds, goToNextImage, isPlaying]);
 
   // No cleanup needed with single image approach
 
@@ -513,7 +503,7 @@ export function Screensaver({ onExit }: Props) {
       {/* Current Image */}
       {currentDisplayImage && (
         <img
-          src={currentDisplayImage}
+          src={currentImage || currentDisplayImage}
           alt="Screensaver"
           className={`absolute max-w-full max-h-full object-contain transition-opacity duration-1000 ease-in-out ${
             isTransitioning ? 'opacity-0' : 'opacity-100'
@@ -714,4 +704,4 @@ export function Screensaver({ onExit }: Props) {
       )}
     </div>
   );
-} 
+}
