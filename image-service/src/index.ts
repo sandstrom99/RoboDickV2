@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import cors from 'cors';
 import imagesRouter from './routes/images';
+import dbService from './services/database';
 import { 
   generalLimiter, 
   securityHeaders, 
@@ -81,10 +82,38 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   });
 });
 
-app.listen(Number(PORT), '0.0.0.0', () => {
-  console.log(`🚀 Image Service listening on:`);
-  console.log(`   Local:    http://localhost:${PORT}`);
-  console.log(`   Network:  http://[YOUR-IP]:${PORT}`);
-  console.log(`📁 Serving images from: /images/`);
-  console.log(`🔒 Security: ${process.env.NODE_ENV === 'production' ? 'Production' : 'Development'} mode`);
+// Initialize database and start server
+async function startServer() {
+  try {
+    console.log('🔌 Initializing database...');
+    await dbService.init();
+    console.log('✅ Database initialized successfully');
+
+    app.listen(Number(PORT), '0.0.0.0', () => {
+      console.log(`🚀 Image Service listening on:`);
+      console.log(`   Local:    http://localhost:${PORT}`);
+      console.log(`   Network:  http://[YOUR-IP]:${PORT}`);
+      console.log(`📁 Serving images from: /images/`);
+      console.log(`🗃️ Database: ${path.join(__dirname, '../data/images.db')}`);
+      console.log(`🔒 Security: ${process.env.NODE_ENV === 'production' ? 'Production' : 'Development'} mode`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to initialize database:', error);
+    process.exit(1);
+  }
+}
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('\n🛑 Shutting down gracefully...');
+  try {
+    await dbService.close();
+    console.log('✅ Database connection closed');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
 });
+
+startServer();
