@@ -82,37 +82,37 @@ export function ImageModal({ image, onClose, onDelete, showDelete = false }: Pro
 
   return (
     <div 
-      className="fixed inset-0 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4"
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
       onClick={handleBackdropClick}
     >
-      <div className="relative max-w-4xl max-h-[90vh] bg-white dark:bg-slate-800 rounded-xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-4xl h-full max-h-[95vh] bg-white dark:bg-slate-800 rounded-lg sm:rounded-xl shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-start justify-between p-4 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex-1 min-w-0 pr-4">
-            <h2 className="text-lg font-semibold text-slate-800 dark:text-white break-words">
+        <div className="flex items-start justify-between p-3 sm:p-4 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
+          <div className="flex-1 min-w-0 pr-2 sm:pr-4">
+            <h2 className="text-base sm:text-lg font-semibold text-slate-800 dark:text-white break-words">
               {image.filename}
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
               Uploaded by {image.uploaderName} on {new Date(image.createdAt).toLocaleDateString()}
             </p>
           </div>
           
-          <div className="flex items-center space-x-2 flex-shrink-0">
+          <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
             {showDelete && (
               <button
                 onClick={handleDelete}
-                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center space-x-2"
+                className="bg-red-500 hover:bg-red-600 text-white px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors duration-200 flex items-center space-x-1 sm:space-x-2"
                 title="Delete image (Admin only)"
               >
                 <span>🗑️</span>
-                <span>Delete</span>
+                <span className="hidden sm:inline">Delete</span>
               </button>
             )}
             
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-2xl p-2"
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl sm:text-2xl p-1 sm:p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
               title="Close"
             >
               ✕
@@ -121,7 +121,7 @@ export function ImageModal({ image, onClose, onDelete, showDelete = false }: Pro
         </div>
 
         {/* Image */}
-        <div className="relative max-h-[60vh] sm:max-h-[70vh] overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-slate-900">
+        <div className="relative flex-1 min-h-0 overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-slate-900">
           <img
             src={fullImageUrl}
             alt={image.filename}
@@ -130,34 +130,38 @@ export function ImageModal({ image, onClose, onDelete, showDelete = false }: Pro
         </div>
 
         {/* Footer with metadata */}
-        <div className="p-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700">
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            {/* Row 1: Uploader | Created */}
-            <div>
+        <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex-shrink-0 max-h-[40vh] overflow-y-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-2 text-xs sm:text-sm">
+            {/* Uploader */}
+            <div className="space-y-1">
               <span className="font-medium text-slate-600 dark:text-slate-400">Uploader:</span>
-              <p className="text-slate-800 dark:text-white truncate">{image.uploaderName}</p>
+              <p className="text-slate-800 dark:text-white break-words">{image.uploaderName}</p>
             </div>
-            <div>
+            
+            {/* Created */}
+            <div className="space-y-1">
               <span className="font-medium text-slate-600 dark:text-slate-400">Created:</span>
-              <p className="text-slate-800 dark:text-white truncate">{new Date(image.createdAt).toLocaleString()}</p>
+              <p className="text-slate-800 dark:text-white break-words">{new Date(image.createdAt).toLocaleString()}</p>
             </div>
 
-            {/* Row 2: UUID | Image URL */}
-            <div>
+            {/* UUID */}
+            <div className="space-y-1 sm:col-span-2">
               <span className="font-medium text-slate-600 dark:text-slate-400">UUID:</span>
               <button
                 onClick={() => copyToClipboard(image.uuid, 'UUID')}
-                className="block w-full text-left text-slate-800 dark:text-white font-mono text-[10px] break-all hover:bg-slate-200 dark:hover:bg-slate-700 p-1 rounded transition-colors duration-200"
+                className="block w-full text-left text-slate-800 dark:text-white font-mono text-[10px] sm:text-xs break-all hover:bg-slate-200 dark:hover:bg-slate-700 p-2 rounded transition-colors duration-200 min-h-[44px] flex items-center"
                 title="Click to copy UUID"
               >
                 {image.uuid}
               </button>
             </div>
-            <div>
+            
+            {/* Image URL */}
+            <div className="space-y-1 sm:col-span-2">
               <span className="font-medium text-slate-600 dark:text-slate-400">Image URL:</span>
               <button
                 onClick={() => copyToClipboard(fullImageUrl, 'Image URL')}
-                className="block w-full text-left text-slate-800 dark:text-white font-mono text-[10px] break-all hover:bg-slate-200 dark:hover:bg-slate-700 p-1 rounded transition-colors duration-200"
+                className="block w-full text-left text-slate-800 dark:text-white font-mono text-[10px] sm:text-xs break-all hover:bg-slate-200 dark:hover:bg-slate-700 p-2 rounded transition-colors duration-200 min-h-[44px] flex items-center"
                 title="Click to copy full image URL"
               >
                 {fullImageUrl}

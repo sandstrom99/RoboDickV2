@@ -50,11 +50,27 @@ export async function listImages(
     const limit = Math.max(parseInt(req.query.limit as string) || 10, 1);
     const orderBy = req.query.orderBy as string || 'createdAt';
     const orderDirection = req.query.orderDirection as string || 'desc';
+    const search = req.query.search as string || '';
     
     const metadata = await readMetadata();
     
-    // Sort the metadata based on orderBy and orderDirection
-    const sortedMetadata = [...metadata].sort((a, b) => {
+    // Filter metadata based on search term (case and space insensitive)
+    let filteredMetadata = metadata;
+    if (search.trim()) {
+      const searchTerm = search.toLowerCase().replace(/\s+/g, '');
+      filteredMetadata = metadata.filter(item => {
+        const filename = item.filename.toLowerCase().replace(/\s+/g, '');
+        const uploaderName = item.uploaderName.toLowerCase().replace(/\s+/g, '');
+        const uuid = item.uuid.toLowerCase().replace(/\s+/g, '');
+        
+        return filename.includes(searchTerm) || 
+               uploaderName.includes(searchTerm) || 
+               uuid.includes(searchTerm);
+      });
+    }
+    
+    // Sort the filtered metadata based on orderBy and orderDirection
+    const sortedMetadata = [...filteredMetadata].sort((a, b) => {
       let aValue: any, bValue: any;
       
       switch (orderBy) {
