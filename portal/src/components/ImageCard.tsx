@@ -28,7 +28,7 @@ export function ImageCard({ image, onDelete, onView, showDelete = false }: Props
       {/* Image */}
       <div className="aspect-square overflow-hidden">
         <img
-          src={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/images/${image.filename}`}
+          src={`${import.meta.env.VITE_IMAGE_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000'}/images/${image.filename}`}
           alt={image.filename}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           loading="lazy"

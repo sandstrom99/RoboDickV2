@@ -65,7 +65,21 @@ npm run preview
 ### Environment Variables
 Create a `.env` file:
 ```env
+# API Service URL (for API calls)
 VITE_API_URL=http://localhost:3000
+
+# Image Service URL (for direct image access)
+VITE_IMAGE_URL=http://localhost:3000
+
+# Portal Password (for admin access)
+VITE_PORTAL_PASSWORD=your-secure-password-here
+```
+
+**For domain setup (e.g., with Cloudflare Tunnel):**
+```env
+VITE_API_URL=https://api.yourdomain.com
+VITE_IMAGE_URL=https://images.yourdomain.com
+VITE_PORTAL_PASSWORD=your-secure-password-here
 ```
 
 ### API Endpoints

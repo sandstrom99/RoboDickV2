@@ -67,7 +67,7 @@ export function ImageModal({ image, onClose, onDelete, showDelete = false }: Pro
         {/* Image */}
         <div className="relative max-h-[70vh] overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-slate-900">
           <img
-            src={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/images/${image.filename}`}
+            src={`${import.meta.env.VITE_IMAGE_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000'}/images/${image.filename}`}
             alt={image.filename}
             className="max-w-full max-h-full object-contain"
           />
