@@ -25,14 +25,17 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<'gallery' | 'screensaver'>('gallery');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [username, setUsername] = useState('');
 
   // Check if user is already authenticated on app load
   useEffect(() => {
     const authenticated = sessionStorage.getItem('portal_authenticated');
     const adminStatus = sessionStorage.getItem('portal_admin');
+    const storedUsername = sessionStorage.getItem('portal_username');
     if (authenticated === 'true') {
       setIsAuthenticated(true);
       setIsAdmin(adminStatus === 'true');
+      setUsername(storedUsername || '');
     }
   }, []);
 
@@ -113,7 +116,7 @@ export default function App() {
     try {
       for (const file of Array.from(files)) {
         try {
-          await uploadImage(file);
+          await uploadImage(file, username);
           uploaded++;
           console.log(`✅ Uploaded: ${file.name}`);
         } catch (error) {
@@ -151,19 +154,23 @@ export default function App() {
   }
 
   // Handle successful authentication
-  const handleAuthentication = (adminAccess: boolean = false) => {
+  const handleAuthentication = (adminAccess: boolean = false, userUsername: string = '') => {
     setIsAuthenticated(true);
     setIsAdmin(adminAccess);
+    setUsername(userUsername);
     sessionStorage.setItem('portal_authenticated', 'true');
     sessionStorage.setItem('portal_admin', adminAccess.toString());
+    sessionStorage.setItem('portal_username', userUsername);
   };
 
   // Handle logout
   const handleLogout = () => {
     sessionStorage.removeItem('portal_authenticated');
     sessionStorage.removeItem('portal_admin');
+    sessionStorage.removeItem('portal_username');
     setIsAuthenticated(false);
     setIsAdmin(false);
+    setUsername('');
     // Reset app state
     setCurrentTab('gallery');
     setIsUploadModalOpen(false);
@@ -208,6 +215,7 @@ export default function App() {
             currentTab={currentTab}
             onTabChange={handleTabChange}
             onLogout={handleLogout}
+            username={username}
           />
         
         <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">

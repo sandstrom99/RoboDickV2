@@ -5,9 +5,10 @@ interface Props {
   currentTab: 'gallery' | 'screensaver';
   onTabChange: (tab: 'gallery' | 'screensaver') => void;
   onLogout: () => void;
+  username: string;
 }
 
-export function Header({ onUploadClick, currentTab, onTabChange, onLogout }: Props) {
+export function Header({ onUploadClick, currentTab, onTabChange, onLogout, username }: Props) {
   return (
     <header className="bg-white dark:bg-slate-800 shadow-lg border-b border-slate-200 dark:border-slate-700">
       <div className="container mx-auto px-4 py-4">
@@ -24,6 +25,11 @@ export function Header({ onUploadClick, currentTab, onTabChange, onLogout }: Pro
                 <p className="text-xs text-slate-600 dark:text-slate-400">
                   RoboDickV2
                 </p>
+                {username && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                    👤 {username}
+                  </p>
+                )}
               </div>
             </div>
             
@@ -86,6 +92,11 @@ export function Header({ onUploadClick, currentTab, onTabChange, onLogout }: Pro
                 <p className="text-sm text-slate-600 dark:text-slate-400">
                   RoboDickV2 Image Management
                 </p>
+                {username && (
+                  <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                    👤 {username}
+                  </p>
+                )}
               </div>
             </div>
             

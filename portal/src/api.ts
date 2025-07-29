@@ -19,7 +19,7 @@ export async function getTotalImageCount(): Promise<number> {
   return res.data.count;
 }
 
-export async function uploadImage(file: File): Promise<ImageMeta> {
+export async function uploadImage(file: File, username: string = 'Portal User'): Promise<ImageMeta> {
   // First, get existing hashes to check for duplicates
   const { data: existingHashes } = await axios.get<{ uuid: string; hash: string; filename: string }[]>(`${API_IMAGES}/hashes`);
   
@@ -47,7 +47,7 @@ export async function uploadImage(file: File): Promise<ImageMeta> {
   formData.append('image', file);
   formData.append('hash', newHash);
   formData.append('uploaderId', 'portal-user');
-  formData.append('uploaderName', 'Portal User');
+  formData.append('uploaderName', username);
   
   console.log(`📤 Uploading ${file.name} with hash: ${newHash}`);
   

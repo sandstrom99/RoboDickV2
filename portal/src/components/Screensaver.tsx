@@ -12,14 +12,19 @@ export function Screensaver({ onExit }: Props) {
   const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [nextImage, setNextImage] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [intervalSeconds, setIntervalSeconds] = useState(5);
+  const [showNextImage, setShowNextImage] = useState(false);
+  const [nextImageVisible, setNextImageVisible] = useState(false);
+  const [currentDisplayImage, setCurrentDisplayImage] = useState<string | null>(null);
+  const [nextDisplayImage, setNextDisplayImage] = useState<string | null>(null);
+  const [nextImageReady, setNextImageReady] = useState(false);
+  const [intervalSeconds, setIntervalSeconds] = useState(10);
   const [isPlaying, setIsPlaying] = useState(true);
   const [showControls, setShowControls] = useState(true);
   const [imagePool, setImagePool] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isCastConnected, setIsCastConnected] = useState(false);
   const [castDeviceName, setCastDeviceName] = useState('');
-  const [preloadedImages, setPreloadedImages] = useState<Set<string>>(new Set());
+  const [currentImageLoaded, setCurrentImageLoaded] = useState(false);
   
   const intervalRef = useRef<number | null>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
@@ -27,6 +32,8 @@ export function Screensaver({ onExit }: Props) {
   const imagePoolRef = useRef<string[]>([]);
   const currentIndexRef = useRef(0);
   const preloadCache = useRef<Map<string, HTMLImageElement>>(new Map());
+  const lastTransitionedImageRef = useRef<string | null>(null);
+  const lastTransitionTimeRef = useRef<number>(0);
 
   // Update refs when state changes
   useEffect(() => {
@@ -37,20 +44,35 @@ export function Screensaver({ onExit }: Props) {
     currentIndexRef.current = currentIndex;
   }, [currentIndex]);
 
-  // Preload an image
-  const preloadImage = useCallback((url: string): Promise<void> => {
+  // Update current image ref when it changes
+  useEffect(() => {
+    if (currentImage) {
+      console.log('🖼️ Current image updated:', currentImage.split('/').pop());
+    }
+  }, [currentImage]);
+
+  // Preload an image and ensure it's fully loaded
+  const preloadImage = useCallback((url: string): Promise<HTMLImageElement> => {
     return new Promise((resolve, reject) => {
-      if (preloadCache.current.has(url)) {
-        resolve();
+      // Check if already preloaded and fully loaded
+      const existing = preloadCache.current.get(url);
+      if (existing && existing.complete && existing.naturalWidth > 0) {
+        console.log(`✅ Image already preloaded: ${url.split('/').pop()}`);
+        resolve(existing);
         return;
       }
 
       const img = new Image();
       img.onload = () => {
-        preloadCache.current.set(url, img);
-        setPreloadedImages(prev => new Set(prev).add(url));
-        console.log(`✅ Preloaded image: ${url.split('/').pop()}`);
-        resolve();
+        // Verify the image is actually loaded
+        if (img.complete && img.naturalWidth > 0) {
+          preloadCache.current.set(url, img);
+          console.log(`✅ Preloaded image: ${url.split('/').pop()} (${img.naturalWidth}x${img.naturalHeight})`);
+          resolve(img);
+        } else {
+          console.error(`❌ Image loaded but incomplete: ${url.split('/').pop()}`);
+          reject(new Error(`Image incomplete: ${url}`));
+        }
       };
       img.onerror = () => {
         console.error(`❌ Failed to preload image: ${url.split('/').pop()}`);
@@ -60,8 +82,8 @@ export function Screensaver({ onExit }: Props) {
     });
   }, []);
 
-  // Preload next few images from the pool
-  const preloadNextImages = useCallback(async (fromIndex: number, count: number = 3) => {
+  // Preload next few images from the pool (silent version to avoid visual interference)
+  const preloadNextImages = useCallback(async (fromIndex: number, count: number = 5) => {
     const pool = imagePoolRef.current;
     if (pool.length === 0) return;
 
@@ -69,18 +91,49 @@ export function Screensaver({ onExit }: Props) {
     for (let i = 1; i <= count && i < pool.length; i++) {
       const nextIndex = (fromIndex + i) % pool.length;
       const imageUrl = pool[nextIndex];
-      if (imageUrl && !preloadCache.current.has(imageUrl)) {
-        imagesToPreload.push(imageUrl);
+      if (imageUrl) {
+        // Only preload if not already cached to avoid unnecessary work
+        if (!preloadCache.current.has(imageUrl)) {
+          imagesToPreload.push(imageUrl);
+        }
       }
     }
 
-    // Preload images in parallel
-    const preloadPromises = imagesToPreload.map(url => 
-      preloadImage(url).catch(err => console.warn(`Preload failed for ${url}:`, err))
-    );
+    // Only log if there are actually images to preload
+    if (imagesToPreload.length > 0) {
+      console.log(`🔄 Silently preloading ${imagesToPreload.length} images...`);
+    }
+
+    // Preload images silently without updating state
+    const preloadPromises = imagesToPreload.map(async (url) => {
+      try {
+        // Use a silent preload that doesn't update React state
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+          img.onload = () => {
+            if (img.complete && img.naturalWidth > 0) {
+              preloadCache.current.set(url, img);
+              resolve(img);
+            } else {
+              reject(new Error(`Image incomplete: ${url}`));
+            }
+          };
+          img.onerror = () => reject(new Error(`Failed to load: ${url}`));
+          img.src = url;
+        });
+        return { success: true, url };
+      } catch (err) {
+        console.warn(`⚠️ Silent preload failed for ${url.split('/').pop()}:`, err);
+        return { success: false, url, error: err };
+      }
+    });
     
-    await Promise.allSettled(preloadPromises);
-  }, [preloadImage]);
+    if (preloadPromises.length > 0) {
+      const results = await Promise.allSettled(preloadPromises);
+      const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+      console.log(`✅ Silently preloaded ${successful}/${imagesToPreload.length} images`);
+    }
+  }, []);
 
   // Fetch random images
   const fetchImagePool = useCallback(async () => {
@@ -90,12 +143,16 @@ export function Screensaver({ onExit }: Props) {
       const fullUrls = response.data.urls.map(url => `${API_BASE}${url}`);
       console.log('✅ Fetched images:', fullUrls.length);
       
+      // Clear old preload cache when fetching new images
+      preloadCache.current.clear();
+      
       setImagePool(fullUrls);
       setCurrentIndex(0);
       
       if (fullUrls.length > 0) {
         // Set the first image and preload the next ones
         setCurrentImage(fullUrls[0]);
+        setCurrentDisplayImage(fullUrls[0]);
         // Preload the first image if not already loaded
         preloadImage(fullUrls[0]).catch(console.warn);
         // Preload next few images
@@ -113,6 +170,16 @@ export function Screensaver({ onExit }: Props) {
       return;
     }
 
+    // Check if enough time has passed since last transition (only if we've had a previous transition)
+    if (lastTransitionTimeRef.current > 0) {
+      const timeSinceLastTransition = Date.now() - lastTransitionTimeRef.current;
+      const minTimeBetweenTransitions = 1500; // 1.5 seconds minimum
+      if (timeSinceLastTransition < minTimeBetweenTransitions) {
+        console.log(`⏭️ Too soon since last transition (${timeSinceLastTransition}ms < ${minTimeBetweenTransitions}ms), skipping...`);
+        return;
+      }
+    }
+
     if (imagePoolRef.current.length === 0) {
       console.log('📷 No images in pool, fetching...');
       fetchImagePool();
@@ -125,11 +192,46 @@ export function Screensaver({ onExit }: Props) {
       return;
     }
 
-    const nextIndex = (currentIndexRef.current + 1) % imagePoolRef.current.length;
-    const nextImageUrl = imagePoolRef.current[nextIndex];
+    let nextIndex = (currentIndexRef.current + 1) % imagePoolRef.current.length;
+    let nextImageUrl = imagePoolRef.current[nextIndex];
     
     if (!nextImageUrl) {
       console.error('❌ No next image available');
+      return;
+    }
+
+    // Handle case where next image is the same as current
+    if (nextImageUrl === currentImage) {
+      if (imagePoolRef.current.length > 1) {
+        console.log('🔄 Next image is the same as current, finding different image...');
+        // Find the next different image
+        for (let i = 1; i < imagePoolRef.current.length; i++) {
+          const testIndex = (currentIndexRef.current + i) % imagePoolRef.current.length;
+          const testUrl = imagePoolRef.current[testIndex];
+          if (testUrl && testUrl !== currentImage) {
+            nextIndex = testIndex;
+            nextImageUrl = testUrl;
+            console.log(`🔄 Found different image at index ${testIndex}: ${testUrl.split('/').pop()}`);
+            break;
+          }
+        }
+        
+        // If we still have the same image, all images are identical
+        if (nextImageUrl === currentImage) {
+          console.log('🔄 All images are identical, fetching new pool...');
+          fetchImagePool();
+          return;
+        }
+      } else {
+        console.log('🔄 Only one image available, fetching new pool...');
+        fetchImagePool();
+        return;
+      }
+    }
+
+    // Additional safety check - ensure we have a valid current image
+    if (!currentImage) {
+      console.log('🔄 No current image available, skipping transition');
       return;
     }
 
@@ -139,36 +241,72 @@ export function Screensaver({ onExit }: Props) {
 
     isTransitioningRef.current = true;
     setIsTransitioning(true);
+    lastTransitionedImageRef.current = nextImageUrl;
+    lastTransitionTimeRef.current = Date.now();
 
     try {
-      // Ensure the next image is preloaded
-      if (!preloadCache.current.has(nextImageUrl)) {
-        console.log('⏳ Preloading next image before transition...');
-        await preloadImage(nextImageUrl);
-      }
+      // Ensure the next image is fully preloaded before starting transition
+      console.log('⏳ Ensuring next image is preloaded before transition...');
+      await preloadImage(nextImageUrl);
+      console.log('✅ Next image is ready for transition');
 
-      // Set the next image for the transition
-      setNextImage(nextImageUrl);
-
-      // Wait for the transition to complete
-      setTimeout(() => {
-        // Swap the images
-        setCurrentImage(nextImageUrl);
-        setNextImage(null);
-        setCurrentIndex(nextIndex);
+      // Start crossfade: clean up any previous next image and set up new one
+      console.log('🔄 Starting crossfade transition...');
+      
+      // Clean up any leftover next image first
+      setNextDisplayImage(null);
+      setShowNextImage(false);
+      setNextImageVisible(false);
+      setNextImageReady(false);
+      
+             // Small delay to ensure cleanup, then set up new next image
+       setTimeout(() => {
+         setNextDisplayImage(nextImageUrl);
+         setShowNextImage(true);
+         setNextImageVisible(false); // Start invisible
+         setNextImageReady(true); // Now ready to show in DOM
+         
+         // Small delay to ensure DOM is ready
+         setTimeout(() => {
+           console.log('🔄 Starting simultaneous crossfade...');
+           setIsTransitioning(true); // Fade out current image
+           setNextImageVisible(true); // Fade in next image
+         }, 50); // Very short delay just to ensure DOM is ready
+       }, 100); // Cleanup delay
+      
+      // After crossfade completes, swap images
+      setTimeout(async () => {
+        console.log('🔄 Crossfade complete, swapping images...');
         
-        // If we've cycled through all images, fetch new ones
+        // Simply update current image and hide next image
+        setCurrentDisplayImage(nextImageUrl);
+        setCurrentImage(nextImageUrl);
+        setCurrentIndex(nextIndex);
+        setNextImageVisible(false);
+        
+        // Don't remove next image from DOM to prevent flash - let next transition clean it up
+        
+                // If we've cycled through all images, fetch new ones
         if (nextIndex === 0) {
           console.log('🔄 Reached end of pool, fetching new images...');
           fetchImagePool();
         }
-        
-        isTransitioningRef.current = false;
-        setIsTransitioning(false);
-
-        // Preload next images
+      }, 1300); // 1 second crossfade + 100ms cleanup + 50ms delay + extra buffer
+      
+      // Preload next images after transition is complete to avoid visual interference
+      // This prevents any preloading activity from causing a black flash
+      setTimeout(() => {
         preloadNextImages(nextIndex);
-      }, 500);
+      }, 2000); // Longer delay to ensure transition is completely finished
+        
+        // Complete the transition after the full duration
+        setTimeout(() => {
+          setIsTransitioning(false);
+          // Allow next transition
+          isTransitioningRef.current = false;
+          lastTransitionedImageRef.current = null;
+          console.log('✅ Transition completed, ready for next image');
+        }, 1400); // 1 second crossfade + 100ms cleanup + 50ms delay + buffer
 
     } catch (error) {
       console.error('❌ Failed to transition to next image:', error);
@@ -201,7 +339,24 @@ export function Screensaver({ onExit }: Props) {
       console.log('🚀 Starting new interval with', intervalSeconds, 'seconds');
       intervalRef.current = window.setInterval(() => {
         console.log('⏰ INTERVAL TICK! - Pool length:', imagePoolRef.current.length, 'Index:', currentIndexRef.current);
-        goToNextImage();
+        // Only proceed if not currently transitioning and we have images
+        if (!isTransitioningRef.current && imagePoolRef.current.length > 0) {
+          // Check timing only if we've had a previous transition
+          if (lastTransitionTimeRef.current > 0) {
+            const timeSinceLastTransition = Date.now() - lastTransitionTimeRef.current;
+            const minTimeBetweenTransitions = 1500; // 1.5 seconds minimum
+            if (timeSinceLastTransition > minTimeBetweenTransitions) {
+              goToNextImage();
+            } else {
+              console.log(`⏭️ Skipping interval tick - too soon since last transition: ${timeSinceLastTransition}ms < ${minTimeBetweenTransitions}ms`);
+            }
+          } else {
+            // First transition, no timing restriction
+            goToNextImage();
+          }
+        } else {
+          console.log(`⏭️ Skipping interval tick - transition in progress: ${isTransitioningRef.current}, no images: ${imagePoolRef.current.length === 0}`);
+        }
       }, intervalSeconds * 1000);
       
       setIsPlaying(true);
@@ -219,7 +374,24 @@ export function Screensaver({ onExit }: Props) {
       window.clearInterval(intervalRef.current);
       intervalRef.current = window.setInterval(() => {
         console.log('⏰ New interval tick');
-        goToNextImage();
+        // Only proceed if not currently transitioning and we have images
+        if (!isTransitioningRef.current && imagePoolRef.current.length > 0) {
+          // Check timing only if we've had a previous transition
+          if (lastTransitionTimeRef.current > 0) {
+            const timeSinceLastTransition = Date.now() - lastTransitionTimeRef.current;
+            const minTimeBetweenTransitions = 1500; // 1.5 seconds minimum
+            if (timeSinceLastTransition > minTimeBetweenTransitions) {
+              goToNextImage();
+            } else {
+              console.log(`⏭️ Skipping new interval tick - too soon since last transition: ${timeSinceLastTransition}ms < ${minTimeBetweenTransitions}ms`);
+            }
+          } else {
+            // First transition, no timing restriction
+            goToNextImage();
+          }
+        } else {
+          console.log(`⏭️ Skipping new interval tick - transition in progress: ${isTransitioningRef.current}, no images: ${imagePoolRef.current.length === 0}`);
+        }
       }, newInterval * 1000);
     }
   }, [isPlaying, goToNextImage]);
@@ -286,14 +458,6 @@ export function Screensaver({ onExit }: Props) {
     fetchImagePool();
     resetControlsTimeout();
     
-    // Start autoplay by default
-    console.log('🚀 Starting autoplay with', intervalSeconds, 'seconds interval');
-    intervalRef.current = window.setInterval(() => {
-      console.log('⏰ AUTOPLAY INTERVAL TICK! - Pool length:', imagePoolRef.current.length, 'Index:', currentIndexRef.current);
-      goToNextImage();
-    }, intervalSeconds * 1000);
-    console.log('▶️ Autoplay started with interval ID:', intervalRef.current);
-    
     document.addEventListener('keydown', handleKeyPress);
     
     return () => {
@@ -310,30 +474,65 @@ export function Screensaver({ onExit }: Props) {
     };
   }, []); // Empty dependency array - only run once
 
+  // Start autoplay after first image is loaded
+  useEffect(() => {
+    if (currentImage && !intervalRef.current) {
+      console.log('🚀 First image loaded, starting autoplay with', intervalSeconds, 'seconds interval');
+      intervalRef.current = window.setInterval(() => {
+        console.log('⏰ AUTOPLAY INTERVAL TICK! - Pool length:', imagePoolRef.current.length, 'Index:', currentIndexRef.current);
+        // Only proceed if not currently transitioning and we have images
+        if (!isTransitioningRef.current && imagePoolRef.current.length > 0) {
+          // Check timing only if we've had a previous transition
+          if (lastTransitionTimeRef.current > 0) {
+            const timeSinceLastTransition = Date.now() - lastTransitionTimeRef.current;
+            const minTimeBetweenTransitions = 1500; // 1.5 seconds minimum
+            if (timeSinceLastTransition > minTimeBetweenTransitions) {
+              goToNextImage();
+            } else {
+              console.log(`⏭️ Skipping autoplay tick - too soon since last transition: ${timeSinceLastTransition}ms < ${minTimeBetweenTransitions}ms`);
+            }
+          } else {
+            // First transition, no timing restriction
+            goToNextImage();
+          }
+        } else {
+          console.log(`⏭️ Skipping autoplay tick - transition in progress: ${isTransitioningRef.current}, no images: ${imagePoolRef.current.length === 0}`);
+        }
+      }, intervalSeconds * 1000);
+      console.log('▶️ Autoplay started with interval ID:', intervalRef.current);
+    }
+  }, [currentImage, intervalSeconds, goToNextImage]);
+
+  // No cleanup needed with single image approach
+
   return (
     <div 
       className="fixed inset-0 bg-black z-50 flex items-center justify-center"
       onMouseMove={handleMouseMove}
     >
       {/* Current Image */}
-      {currentImage && (
+      {currentDisplayImage && (
         <img
-          src={currentImage}
+          src={currentDisplayImage}
           alt="Screensaver"
-          className={`absolute max-w-full max-h-full object-contain transition-opacity duration-500 ${
+          className={`absolute max-w-full max-h-full object-contain transition-opacity duration-1000 ease-in-out ${
             isTransitioning ? 'opacity-0' : 'opacity-100'
           }`}
+          onLoad={() => setCurrentImageLoaded(true)}
+          onError={() => setCurrentImageLoaded(true)}
         />
       )}
 
-      {/* Next Image (for smooth transitions) */}
-      {nextImage && (
+      {/* Next Image (for crossfade) */}
+      {nextDisplayImage && showNextImage && nextImageReady && (
         <img
-          src={nextImage}
-          alt="Next Screensaver"
-          className={`absolute max-w-full max-h-full object-contain transition-opacity duration-500 ${
-            isTransitioning ? 'opacity-100' : 'opacity-0'
+          src={nextDisplayImage}
+          alt="Screensaver"
+          className={`absolute max-w-full max-h-full object-contain transition-opacity duration-1000 ease-in-out ${
+            nextImageVisible ? 'opacity-100' : 'opacity-0'
           }`}
+          onLoad={() => setCurrentImageLoaded(true)}
+          onError={() => setCurrentImageLoaded(true)}
         />
       )}
 
@@ -347,6 +546,11 @@ export function Screensaver({ onExit }: Props) {
             <h2 className="text-xl font-bold">🎬 Image Screensaver</h2>
             <div className="text-sm text-slate-300">
               {currentImage && <div className="text-xs mt-1">Current: {currentImage.split('/').pop()}</div>}
+              {isTransitioning && (
+                <div className="text-xs mt-1 text-yellow-300">
+                  🔄 Crossfading...
+                </div>
+              )}
             </div>
           </div>
           
