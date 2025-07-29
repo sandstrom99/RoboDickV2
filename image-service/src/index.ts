@@ -34,15 +34,19 @@ if (allowedIPs.length > 0) {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve uploaded images with proper headers for media streaming
+// Serve uploaded images with enhanced headers for Cloudflare CDN
 app.use('/images', (req, res, next) => {
-  // Set headers for better media streaming and Chromecast compatibility
+  // Enhanced headers for Cloudflare CDN optimization
   res.set({
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-    'Access-Control-Allow-Headers': 'Range, Content-Range, Content-Type',
+    'Access-Control-Allow-Headers': 'Range, Content-Range, Content-Type, Accept-Encoding',
     'Accept-Ranges': 'bytes',
-    'Cache-Control': 'public, max-age=31536000' // 1 year cache for images
+    'Cache-Control': 'public, max-age=31536000, immutable', // 1 year cache, immutable
+    'ETag': `"${Date.now()}"`, // Simple ETag for cache validation
+    'Vary': 'Accept-Encoding', // Allow different cached versions for different encodings
+    'X-Content-Type-Options': 'nosniff', // Security header
+    'X-Frame-Options': 'SAMEORIGIN' // Security header
   });
   next();
 }, express.static(path.join(__dirname, '..', 'uploads')));

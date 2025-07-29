@@ -8,6 +8,7 @@ const HASH_THRESHOLD = parseInt(process.env.HASH_THRESHOLD || '5', 10);
 const SFW_CHANNEL_ID = process.env.SFW_CHANNEL_ID!;
 const OWNER_ID = process.env.OWNER_ID!;
 const BASE_URL = process.env.BASE_URL!;
+const IMAGE_URL = process.env.IMAGE_URL!;
 
 interface ImageMeta {
   uuid: string;
@@ -41,7 +42,7 @@ export async function handleDelete(msg: Message, uuid: string) {
 export async function handleInfo(msg: Message, uuid: string) {
   try {
     const { data } = await apiClient.get<ImageMeta>(`/images/${uuid}`);
-    const imageUrl = `${BASE_URL}/images/${data.filename}`;
+    const imageUrl = `${IMAGE_URL}/images/${data.filename}`;
     const resp = await apiClient.get<ArrayBuffer>(imageUrl, { responseType: 'arraybuffer' });
     const buffer = Buffer.from(resp.data);
     const attachment = new AttachmentBuilder(buffer, { name: data.filename });
@@ -72,7 +73,7 @@ export async function handleFetch(msg: Message, countArg?: string) {
   const { data } = await apiClient.get<{ images: ImageMeta[] }>(`/images?page=1&limit=${num}`);
   const attachments = await Promise.all(
     data.images.map(async img => {
-      const url = `${BASE_URL}/images/${img.filename}`;
+      const url = `${IMAGE_URL}/images/${img.filename}`;
       const resp = await apiClient.get<ArrayBuffer>(url, { responseType: 'arraybuffer' });
       return new AttachmentBuilder(Buffer.from(resp.data), { name: img.filename });
     })
@@ -92,7 +93,7 @@ export async function handleRandom(msg: Message, countArg?: string) {
   }
   const attachments = await Promise.all(
     data.urls.map(async urlPath => {
-      const url = `${BASE_URL}${urlPath}`;
+      const url = `${IMAGE_URL}${urlPath}`;
       const resp = await apiClient.get<ArrayBuffer>(url, { responseType: 'arraybuffer' });
       const filename = urlPath.split('/').pop() || 'image.jpg';
       return new AttachmentBuilder(Buffer.from(resp.data), { name: filename });
