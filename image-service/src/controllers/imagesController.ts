@@ -162,10 +162,16 @@ export async function deleteImage(
       return res.status(404).json({ error: 'Image not found' });
     }
     
-    // remove file
-    await fs.unlink(path.join(UPLOAD_DIR, record.filename));
+    // Try to remove file, but don't fail if file is missing/corrupted
+    try {
+      await fs.unlink(path.join(UPLOAD_DIR, record.filename));
+      console.log(`✅ Deleted file: ${record.filename}`);
+    } catch (fileErr) {
+      console.warn(`⚠️  Could not delete file ${record.filename}:`, (fileErr as Error).message);
+      // Continue anyway - we still want to remove the database entry
+    }
     
-    // remove from database
+    // Always remove from database (even if file deletion failed)
     await dbService.deleteImage(uuid);
     
     res.status(204).end();

@@ -44,8 +44,7 @@ export function useImages() {
   }, []);
 
   const handleDelete = useCallback(async (id: string) => {
-    if (!confirm('Are you sure you want to delete this image? This action cannot be undone.')) return;
-    
+    // Note: Confirmation should be handled by the calling component (ImageModal, ImageCard, etc.)
     try {
       await deleteImage(id);
       await loadPage(page, searchTerm);
