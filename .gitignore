@@ -146,6 +146,7 @@ discord-bot/dist/
 # Image Service
 image-service/uploads/
 image-service/data/metadata.json
+image-service/data/images.db
 image-service/dist/
 
 # Portal (React/Vite)
