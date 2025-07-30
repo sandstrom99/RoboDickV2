@@ -47,7 +47,8 @@ export async function listImages(
       filename: rec.filename,
       url: rec.filename,
       createdAt: rec.createdAt,
-      hash: rec.hash
+      hash: rec.hash,
+      tags: rec.tags || []
     }));
     
     res.json({ total, page, images });

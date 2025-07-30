@@ -24,6 +24,8 @@ export function HomePage() {
     totalImages,
     setPage,
     setSearchTerm,
+    refresh,
+    updateImageInList,
     handleDelete,
     handleUpload,
   } = useImages();
@@ -46,6 +48,17 @@ export function HomePage() {
   const handleImageUpload = async (files: FileList) => {
     await handleUpload(files, username);
     setIsUploadModalOpen(false);
+  };
+
+  const handleImageUpdate = (updatedImage: ImageMeta) => {
+    // Update the selected image in the modal immediately
+    setSelectedImage(updatedImage);
+    
+    // Update the image in the main grid immediately 
+    updateImageInList(updatedImage);
+    
+    // Refresh in background to ensure we have latest data from server
+    refresh();
   };
 
   const handleLogout = () => {
@@ -152,6 +165,7 @@ export function HomePage() {
         image={selectedImage}
         onClose={() => setSelectedImage(null)}
         onDelete={handleImageDelete}
+        onImageUpdate={handleImageUpdate}
         showDelete={isAdmin}
       />
     </div>

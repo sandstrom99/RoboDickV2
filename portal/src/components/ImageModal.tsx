@@ -1,11 +1,15 @@
-import React from 'react';
-import type { ImageMeta } from '../types';
+import React, { useState, useEffect } from 'react';
+import type { ImageMeta, Tag, CreateTagRequest } from '../types';
+import { TagBadge } from './TagBadge';
+import { TagSearchBar } from './TagSearchBar';
+import { fetchTags, fetchImageById, createTag, addTagToImage, removeTagFromImage } from '../api';
 
 interface Props {
   image: ImageMeta | null;
   onClose: () => void;
   onDelete: (id: string) => void;
   showDelete?: boolean;
+  onImageUpdate?: (updatedImage: ImageMeta) => void;
 }
 
 // Global scroll manager to avoid React lifecycle issues
@@ -39,10 +43,17 @@ class ScrollManager {
   }
 }
 
-export function ImageModal({ image, onClose, onDelete, showDelete = false }: Props) {
+export function ImageModal({ image, onClose, onDelete, showDelete = false, onImageUpdate }: Props) {
+  const [currentImage, setCurrentImage] = useState<ImageMeta | null>(image);
+
+  // Update currentImage when image prop changes
+  useEffect(() => {
+    setCurrentImage(image);
+  }, [image]);
+
   // Manage scroll lock based on image presence using a stable effect
   React.useEffect(() => {
-    if (image) {
+    if (currentImage) {
       // Lock scroll when an image is provided (modal opens)
       ScrollManager.lockScroll();
       return () => {
@@ -50,14 +61,29 @@ export function ImageModal({ image, onClose, onDelete, showDelete = false }: Pro
         ScrollManager.unlockScroll();
       };
     }
-  }, [image]);
+  }, [currentImage]);
+
+  // Refresh the current image data from the server
+  const refreshImageData = async () => {
+    if (!currentImage) return;
+    
+    try {
+      const updatedImage = await fetchImageById(currentImage.uuid);
+      setCurrentImage(updatedImage);
+      if (onImageUpdate) {
+        onImageUpdate(updatedImage);
+      }
+    } catch (error) {
+      console.error('❌ Failed to refresh image data:', error);
+    }
+  };
 
   // If there's no image, render nothing (after hooks have run)
-  if (!image) return null;
+  if (!currentImage) return null;
 
   const handleDelete = () => {
-    if (confirm(`Are you sure you want to delete ${image.filename}? This action cannot be undone.`)) {
-      onDelete(image.uuid);
+    if (confirm(`Are you sure you want to delete ${currentImage.filename}? This action cannot be undone.`)) {
+      onDelete(currentImage.uuid);
       onClose();
     }
   };
@@ -78,7 +104,23 @@ export function ImageModal({ image, onClose, onDelete, showDelete = false }: Pro
     }
   };
 
-  const fullImageUrl = `${import.meta.env.VITE_IMAGE_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000'}/images/${image.filename}`;
+  const handleRemoveTag = async (tag: Tag) => {
+    try {
+      await removeTagFromImage(currentImage.uuid, tag.id);
+      // Refresh image data to get updated tags
+      await refreshImageData();
+    } catch (error) {
+      console.error('❌ Failed to remove tag:', error);
+      alert('Failed to remove tag. Please try again.');
+    }
+  };
+
+  const handleTagAdded = async () => {
+    // Refresh image data when a tag is added via the search bar
+    await refreshImageData();
+  };
+
+  const fullImageUrl = `${import.meta.env.VITE_IMAGE_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000'}/images/${currentImage.filename}`;
 
   return (
     <div 
@@ -91,10 +133,10 @@ export function ImageModal({ image, onClose, onDelete, showDelete = false }: Pro
         <div className="flex items-start justify-between p-3 sm:p-4 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
           <div className="flex-1 min-w-0 pr-2 sm:pr-4">
             <h2 className="text-base sm:text-lg font-semibold text-slate-800 dark:text-white break-words">
-              {image.filename}
+              {currentImage.filename}
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Uploaded by {image.uploaderName} on {new Date(image.createdAt).toLocaleDateString()}
+              Uploaded by {currentImage.uploaderName} on {new Date(currentImage.createdAt).toLocaleDateString()}
             </p>
           </div>
           
@@ -124,47 +166,64 @@ export function ImageModal({ image, onClose, onDelete, showDelete = false }: Pro
         <div className="relative flex-1 min-h-0 overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-slate-900">
           <img
             src={fullImageUrl}
-            alt={image.filename}
+            alt={currentImage.filename}
             className="max-w-full max-h-full object-contain"
           />
+          
+          {/* Tags Overlay on Image */}
+          {currentImage.tags && currentImage.tags.length > 0 && (
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
+              <div className="flex flex-wrap gap-2">
+                {currentImage.tags.map(tag => (
+                  <TagBadge
+                    key={tag.id}
+                    tag={tag}
+                    size="md"
+                    showRemove={true}
+                    onRemove={() => handleRemoveTag(tag)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Add Tag Section - Full Width */}
+        <div className="flex-shrink-0 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+          <div className="p-3 sm:p-4">
+            <TagSearchBar
+              imageUuid={currentImage.uuid}
+              onTagAdded={handleTagAdded}
+              excludeTagIds={currentImage.tags?.map(tag => tag.id) || []}
+            />
+          </div>
         </div>
 
         {/* Footer with metadata */}
-        <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex-shrink-0 max-h-[40vh] overflow-y-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-2 text-xs sm:text-sm">
-            {/* Uploader */}
-            <div className="space-y-1">
-              <span className="font-medium text-slate-600 dark:text-slate-400">Uploader:</span>
-              <p className="text-slate-800 dark:text-white break-words">{image.uploaderName}</p>
-            </div>
-            
-            {/* Created */}
-            <div className="space-y-1">
-              <span className="font-medium text-slate-600 dark:text-slate-400">Created:</span>
-              <p className="text-slate-800 dark:text-white break-words">{new Date(image.createdAt).toLocaleString()}</p>
-            </div>
-
-            {/* UUID */}
-            <div className="space-y-1 sm:col-span-2">
-              <span className="font-medium text-slate-600 dark:text-slate-400">UUID:</span>
+        <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
+          <div className="space-y-4">
+            {/* Metadata */}
+            <div className="flex gap-3 justify-center">
+              {/* Copy UUID */}
               <button
-                onClick={() => copyToClipboard(image.uuid, 'UUID')}
-                className="block w-full text-left text-slate-800 dark:text-white font-mono text-[10px] sm:text-xs break-all hover:bg-slate-200 dark:hover:bg-slate-700 p-2 rounded transition-colors duration-200 min-h-[44px] flex items-center"
-                title="Click to copy UUID"
+                onClick={() => copyToClipboard(currentImage.uuid, 'UUID')}
+                className="flex items-center space-x-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 
+                           text-slate-700 dark:text-slate-300 rounded-lg transition-colors duration-200"
+                title="Copy UUID to clipboard"
               >
-                {image.uuid}
+                <span>📋</span>
+                <span className="text-sm font-medium">Copy UUID</span>
               </button>
-            </div>
-            
-            {/* Image URL */}
-            <div className="space-y-1 sm:col-span-2">
-              <span className="font-medium text-slate-600 dark:text-slate-400">Image URL:</span>
+              
+              {/* Copy Image URL */}
               <button
                 onClick={() => copyToClipboard(fullImageUrl, 'Image URL')}
-                className="block w-full text-left text-slate-800 dark:text-white font-mono text-[10px] sm:text-xs break-all hover:bg-slate-200 dark:hover:bg-slate-700 p-2 rounded transition-colors duration-200 min-h-[44px] flex items-center"
-                title="Click to copy full image URL"
+                className="flex items-center space-x-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 
+                           text-slate-700 dark:text-slate-300 rounded-lg transition-colors duration-200"
+                title="Copy image URL to clipboard"
               >
-                {fullImageUrl}
+                <span>🔗</span>
+                <span className="text-sm font-medium">Copy URL</span>
               </button>
             </div>
           </div>

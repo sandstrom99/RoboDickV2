@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { ImageMeta } from './types';
+import type { ImageMeta, Tag, CreateTagRequest } from './types';
 import { computeHash, hammingDistance } from './utils/imageHash';
 
 const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}`;
@@ -18,6 +18,11 @@ export async function fetchImages(page: number, limit: number, orderBy: string =
   }
   
   const res = await axios.get(`${API_IMAGES}?${params.toString()}`);
+  return res.data;
+}
+
+export async function fetchImageById(uuid: string): Promise<ImageMeta> {
+  const res = await axios.get(`${API_IMAGES}/${uuid}`);
   return res.data;
 }
 
@@ -74,6 +79,48 @@ export async function uploadImage(file: File, username: string = 'Portal User'):
 
 export async function fetchRandomImages(count: number = 9): Promise<{ urls: string[] }> {
   const res = await axios.get(`${API_IMAGES}/random?count=${count}`);
+  return res.data;
+}
+
+// ================================
+// TAG API FUNCTIONS
+// ================================
+
+export async function fetchTags(): Promise<Tag[]> {
+  const res = await axios.get(`${API_BASE}/api/tags`);
+  return res.data;
+}
+
+export async function fetchPopularTags(search: string = '', limit: number = 10): Promise<Tag[]> {
+  const params = new URLSearchParams();
+  if (search.trim()) {
+    params.append('search', search.trim());
+  }
+  params.append('limit', limit.toString());
+  
+  const res = await axios.get(`${API_BASE}/api/tags/popular?${params.toString()}`);
+  return res.data;
+}
+
+export async function createTag(tagData: CreateTagRequest): Promise<Tag> {
+  const res = await axios.post(`${API_BASE}/api/tags`, tagData);
+  return res.data;
+}
+
+export async function deleteTag(tagId: number): Promise<void> {
+  await axios.delete(`${API_BASE}/api/tags/${tagId}`);
+}
+
+export async function addTagToImage(imageUuid: string, tagId: number): Promise<void> {
+  await axios.post(`${API_BASE}/api/tags/${tagId}/images/${imageUuid}`);
+}
+
+export async function removeTagFromImage(imageUuid: string, tagId: number): Promise<void> {
+  await axios.delete(`${API_BASE}/api/tags/${tagId}/images/${imageUuid}`);
+}
+
+export async function fetchImageTags(imageUuid: string): Promise<Tag[]> {
+  const res = await axios.get(`${API_BASE}/api/tags/image/${imageUuid}`);
   return res.data;
 }
 

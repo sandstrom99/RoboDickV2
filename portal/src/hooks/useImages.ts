@@ -14,16 +14,11 @@ export function useImages() {
   const loadPage = useCallback(async (p: number, search: string = '') => {
     setLoading(true);
     try {
-      console.log('🔍 Loading page:', p, 'with limit:', limit, 'search:', search);
-      console.log('🌐 API URL:', `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/images?page=${p}&limit=${limit}&orderBy=createdAt&orderDirection=desc${search ? '&search=' + encodeURIComponent(search) : ''}`);
-      
       const data = await fetchImages(p, limit, 'createdAt', 'desc', search);
-      console.log('✅ Received data:', data);
       
       setImages(data.images);
       setTotal(data.total);
       
-      console.log('📊 Set images count:', data.images.length, 'Total:', data.total);
     } catch (error) {
       console.error('❌ Failed to load images:', error);
       alert('Failed to connect to image service. Make sure it\'s running on http://localhost:3000');
@@ -34,9 +29,7 @@ export function useImages() {
 
   const loadTotalStats = useCallback(async () => {
     try {
-      console.log('📈 Loading total stats...');
       const count = await getTotalImageCount();
-      console.log('📊 Total image count:', count);
       setTotalImages(count);
     } catch (error) {
       console.error('❌ Failed to load stats:', error);
@@ -67,11 +60,9 @@ export function useImages() {
         try {
           await uploadImage(file, username);
           uploaded++;
-          console.log(`✅ Uploaded: ${file.name}`);
         } catch (error) {
           if (error instanceof Error && error.message.includes('Duplicate image detected')) {
             duplicates++;
-            console.log(`🚫 Duplicate: ${file.name} - ${error.message}`);
           } else {
             errors++;
             console.error(`❌ Failed to upload ${file.name}:`, error);
@@ -120,6 +111,14 @@ export function useImages() {
   // No need for client-side filtering since we now have server-side search
   const filteredImages = images;
 
+  const updateImageInList = useCallback((updatedImage: ImageMeta) => {
+    setImages(prevImages => 
+      prevImages.map(img => 
+        img.uuid === updatedImage.uuid ? updatedImage : img
+      )
+    );
+  }, []);
+
   return {
     images,
     filteredImages,
@@ -133,6 +132,8 @@ export function useImages() {
     setSearchTerm,
     loadPage: (p: number) => loadPage(p, searchTerm),
     loadTotalStats,
+    refresh: () => loadPage(page, searchTerm),
+    updateImageInList,
     handleDelete,
     handleUpload,
   };

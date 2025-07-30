@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import cors from 'cors';
 import imagesRouter from './routes/images';
+import tagsRouter from './routes/tags';
 import dbService from './services/database';
 import { 
   generalLimiter, 
@@ -63,6 +64,7 @@ app.get('/health', (req: Request, res: Response) => {
 
 // API routes
 app.use('/api/images', imagesRouter);
+app.use('/api/tags', tagsRouter);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
